@@ -1,0 +1,72 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "DM Sans", ui-sans-serif, system-ui, sans-serif;
+  --color-mbolea: #059669;
+  --color-mbolea-dark: #047857;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  background: #f8fafc;
+  color: #0f172a;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+/* Focus visible for a11y */
+:focus-visible {
+  outline: 2px solid var(--color-mbolea);
+  outline-offset: 2px;
+}
+
+/* Simple table style for dashboards */
+.table-simple {
+  @apply w-full text-left text-sm;
+}
+.table-simple thead tr {
+  @apply border-b border-slate-200;
+}
+.table-simple th {
+  @apply pb-3 font-medium text-slate-500;
+}
+.table-simple tbody tr {
+  @apply border-b border-slate-100;
+}
+.table-simple td {
+  @apply py-3 text-slate-700;
+}
+
+/* Toast shake when duplicate error is triggered */
+@keyframes toast-shake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-6px); }
+  40% { transform: translateX(6px); }
+  60% { transform: translateX(-4px); }
+  80% { transform: translateX(4px); }
+}
+.animate-toast-shake {
+  animation: toast-shake 0.5s ease-in-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  .animate-toast-shake {
+    animation: none;
+  }
+}

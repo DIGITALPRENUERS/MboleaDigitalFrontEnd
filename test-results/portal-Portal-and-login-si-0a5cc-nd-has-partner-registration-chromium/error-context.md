@@ -1,0 +1,44 @@
+# Page snapshot
+
+```yaml
+- generic [active] [ref=e1]:
+  - generic [ref=e4]:
+    - link "Mbolea Digital" [ref=e5] [cursor=pointer]:
+      - /url: /
+      - img [ref=e6]
+      - generic [ref=e9]: Mbolea Digital
+    - heading "Create account" [level=1] [ref=e10]
+    - paragraph [ref=e11]: Register as a sales point, supplier, logistic, or TFRA user.
+    - generic [ref=e12]:
+      - generic [ref=e13]:
+        - generic [ref=e14]: Full name
+        - textbox "Your name" [ref=e16]
+      - generic [ref=e17]:
+        - generic [ref=e18]: Email
+        - textbox "you@example.com" [ref=e20]
+      - generic [ref=e21]:
+        - generic [ref=e22]: Password (min 8 characters)
+        - generic [ref=e23]:
+          - textbox "••••••••" [ref=e24]
+          - button "Show password" [ref=e25]:
+            - img [ref=e26]
+      - generic [ref=e29]:
+        - generic [ref=e30]: Role
+        - combobox [ref=e31]:
+          - option "Sales point / Warehouse" [selected]
+          - option "Supplier"
+          - option "Logistic"
+          - option "TFRA"
+      - generic [ref=e32]:
+        - generic [ref=e33]: Company (optional)
+        - textbox "Organization name" [ref=e35]
+      - generic [ref=e36]:
+        - generic [ref=e37]: Company code (optional)
+        - textbox "Code" [ref=e39]
+      - button "Continue" [ref=e40]
+    - paragraph [ref=e41]:
+      - text: Already have an account?
+      - link "Sign in" [ref=e42] [cursor=pointer]:
+        - /url: /login
+  - generic "Notifications"
+```
