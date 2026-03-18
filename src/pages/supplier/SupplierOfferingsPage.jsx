@@ -46,10 +46,11 @@ export default function SupplierOfferingsPage() {
   const [orders, setOrders] = useState([]);
   const [deliveries, setDeliveries] = useState([]);
   const [loading, setLoading] = useState({ fertilizers: true, offerings: true, orders: true, deliveries: true });
-  const [form, setForm] = useState({ fertilizerId: '', unitPrice: '', packageKilos: '' });
+  const [form, setForm] = useState({ fertilizerId: '', unitPrice: '', packageKilos: '', availableStock: '' });
   const [submitting, setSubmitting] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [editPrice, setEditPrice] = useState('');
+  const [editStock, setEditStock] = useState('');
   const [expandedOrderId, setExpandedOrderId] = useState(null);
   const [confirmingRemoveId, setConfirmingRemoveId] = useState(null);
   /** When set, we're confirming this order; value is 'own' | 'platform' for which button is loading. */
@@ -236,8 +237,9 @@ export default function SupplierOfferingsPage() {
     const fertilizerId = Number(form.fertilizerId);
     const packageKilos = form.packageKilos ? Number(form.packageKilos) : null;
     const unitPrice = Number(form.unitPrice);
-    if (!fertilizerId || !packageKilos || unitPrice < 0) {
-      toast.error('Select fertilizer, package size (5, 10, 25, or 50 kg), and enter price in TZS.');
+    const availableStock = form.availableStock === '' ? null : Number(form.availableStock);
+    if (!fertilizerId || !packageKilos || unitPrice < 0 || availableStock == null || availableStock < 0) {
+      toast.error('Select fertilizer, package size (5, 10, 25, or 50 kg), enter price in TZS, and available stock (>= 0).');
       return;
     }
     setSubmitting(true);
@@ -246,9 +248,10 @@ export default function SupplierOfferingsPage() {
         fertilizerId,
         packageKilos,
         unitPrice,
+        availableStock,
       });
       toast.success('Fertilizer added. Price must not exceed TFRA standard (TZS).');
-      setForm({ fertilizerId: '', unitPrice: '', packageKilos: '' });
+      setForm({ fertilizerId: '', unitPrice: '', packageKilos: '', availableStock: '' });
       load();
     } catch (err) {
       toast.error(withContext('Add offering', err));
@@ -259,11 +262,13 @@ export default function SupplierOfferingsPage() {
 
   const handleUpdate = async (id) => {
     const unitPrice = Number(editPrice);
+    const availableStock = editStock === '' ? null : Number(editStock);
     if (unitPrice < 0) return;
+    if (availableStock != null && availableStock < 0) return;
     setSubmitting(true);
     try {
-      await supplierOfferingsApi.updateOffering(id, { unitPrice });
-      toast.success('Price updated.');
+      await supplierOfferingsApi.updateOffering(id, { unitPrice, availableStock });
+      toast.success('Offering updated.');
       setEditingId(null);
       load();
     } catch (err) {
@@ -1114,9 +1119,22 @@ export default function SupplierOfferingsPage() {
                       ) : null;
                     })()}
                   </div>
+                  <div className="min-w-[160px]">
+                    <Input
+                      label="Available stock (bags)"
+                      type="number"
+                      step="1"
+                      min="0"
+                      required
+                      value={form.availableStock}
+                      onChange={(e) => setForm((f) => ({ ...f, availableStock: e.target.value }))}
+                      placeholder="e.g. 120"
+                      className="min-w-[160px]"
+                    />
+                  </div>
                   <Button
                     type="submit"
-                    disabled={!form.fertilizerId || !form.packageKilos || !form.unitPrice || submitting}
+                    disabled={!form.fertilizerId || !form.packageKilos || !form.unitPrice || form.availableStock === '' || submitting}
                     isLoading={submitting}
                   >
                     Add
@@ -1148,6 +1166,7 @@ export default function SupplierOfferingsPage() {
                           <th className="pb-2 font-medium text-slate-700">Code</th>
                           <th className="pb-2 font-medium text-slate-700">Unit price (TZS)</th>
                           <th className="pb-2 font-medium text-slate-700">Package (kg)</th>
+                          <th className="pb-2 font-medium text-slate-700">Available stock</th>
                           <th className="pb-2 font-medium text-slate-700">Added</th>
                           <th className="pb-2 font-medium text-slate-700">Actions</th>
                         </tr>
@@ -1198,6 +1217,20 @@ export default function SupplierOfferingsPage() {
                             <td className="py-3 text-slate-600">
                               {o.packageKilos != null ? o.packageKilos : '—'}
                             </td>
+                            <td className="py-3 text-slate-700">
+                              {editingId === o.id ? (
+                                <input
+                                  type="number"
+                                  step="1"
+                                  min="0"
+                                  value={editStock}
+                                  onChange={(e) => setEditStock(e.target.value)}
+                                  className="w-24 rounded border border-slate-200 px-2 py-1 text-sm"
+                                />
+                              ) : (
+                                <span className="font-medium">{o.availableStock != null ? Number(o.availableStock).toLocaleString() : '—'}</span>
+                              )}
+                            </td>
                             <td className="py-3 text-slate-500 text-xs">
                               {o.createdAt ? formatDateTime(o.createdAt) : '—'}
                             </td>
@@ -1210,9 +1243,10 @@ export default function SupplierOfferingsPage() {
                                     onClick={() => {
                                       setEditingId(o.id);
                                       setEditPrice(String(o.unitPrice ?? ''));
+                                      setEditStock(String(o.availableStock ?? '0'));
                                     }}
                                   >
-                                    Edit price
+                                    Edit
                                   </Button>
                                   <Button
                                     size="sm"

@@ -54,6 +54,7 @@ export default function CatalogPage() {
                     <th className="pb-2 font-medium text-slate-700">Unit</th>
                     <th className="pb-2 font-medium text-slate-700">Package (kg)</th>
                     <th className="pb-2 font-medium text-slate-700">Unit price (TZS)</th>
+                    <th className="pb-2 font-medium text-slate-700">Available stock</th>
                     <th className="pb-2 font-medium text-slate-700">Supplier</th>
                   </tr>
                 </thead>
@@ -65,6 +66,7 @@ export default function CatalogPage() {
                       <td className="py-3 text-slate-600">{o.unit ?? '—'}</td>
                       <td className="py-3 text-slate-600">{o.packageKilos != null ? o.packageKilos : '—'}</td>
                       <td className="py-3 font-medium text-slate-800">{o.unitPrice != null ? Number(o.unitPrice).toLocaleString() : '—'}</td>
+                      <td className="py-3 text-slate-700">{o.availableStock != null ? Number(o.availableStock).toLocaleString() : '—'}</td>
                       <td className="py-3 text-slate-600">
                         {o.supplierName || o.supplierCompanyName || '—'}
                         {o.supplierCompanyName && o.supplierName && o.supplierCompanyName !== o.supplierName && ` (${o.supplierCompanyName})`}

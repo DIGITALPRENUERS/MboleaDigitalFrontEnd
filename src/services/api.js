@@ -1,10 +1,11 @@
 import axios from 'axios';
 import { getStoredToken, setAuthStorage } from './authStorage';
 
-// Use relative URL so the app works when opened from other devices on the network
-// (e.g. http://192.168.100.45:5173/). Vite proxy forwards /api to the backend.
+// Use env-driven API base URL for production (Railway), but keep Vite-dev behavior working.
+// Backend is hosted under context-path: /api, so the base should be: https://backend-host/api
+// In dev, VITE_API_BASE_URL can be left empty; we default to relative '/api' (Vite proxy handles it).
 const api = axios.create({
-  baseURL: '/api',
+  baseURL: (import.meta.env.VITE_API_BASE_URL || '/api').replace(/\/$/, ''),
   headers: { 'Content-Type': 'application/json' },
 });
 

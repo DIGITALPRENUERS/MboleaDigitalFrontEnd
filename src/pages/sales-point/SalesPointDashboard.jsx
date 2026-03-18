@@ -211,6 +211,14 @@ export default function SalesPointDashboard() {
     loadSuppliers();
   }, []);
 
+  // Lightweight polling so stock changes reflect soon after payment confirmations (webhook/simulate-confirm).
+  useEffect(() => {
+    const id = setInterval(() => {
+      loadCatalog();
+    }, 15000);
+    return () => clearInterval(id);
+  }, []);
+
   /** Unique fertilizer types and KGs from catalog (for filter dropdowns). */
   const catalogFertilizerTypes = useMemo(() => {
     const set = new Set();
