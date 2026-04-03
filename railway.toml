@@ -1,8 +1,7 @@
 # Mbolea frontend — deploy from this repo root (leave Railway "Root Directory" empty).
 #
-# Variables: set VITE_API_BASE_URL to your public API base (must include /api), e.g.
-#   https://your-backend.up.railway.app/api
-# Mark it available at build time so Vite inlines it.
+# API: default is .env.production (Mbolea backend). Override with variable VITE_API_BASE_URL
+# (must include /api, e.g. https://mboleadigitalbackend-production.up.railway.app/api) at build time if needed.
 #
 # https://docs.railway.com/reference/config-as-code
 
