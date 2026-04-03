@@ -1,0 +1,13 @@
+# Railway: connect the GitHub repo root (this folder). Set VITE_API_BASE_URL at build time
+# to your backend public URL including /api, e.g. https://your-api.up.railway.app/api
+# https://docs.railway.com/reference/config-as-code
+
+[build]
+builder = "NIXPACKS"
+buildCommand = "npm ci && npm run build"
+
+[deploy]
+startCommand = "npm run start"
+restartPolicyType = "ON_FAILURE"
+healthcheckPath = "/"
+healthcheckTimeout = 300

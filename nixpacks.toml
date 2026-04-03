@@ -1,0 +1,3 @@
+# Pin Node for reproducible Railway / Nixpacks builds
+[variables]
+NIXPACKS_NODE_VERSION = "20"
