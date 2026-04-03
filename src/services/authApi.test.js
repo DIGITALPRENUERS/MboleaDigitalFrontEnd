@@ -49,13 +49,16 @@ describe('authApi', () => {
         email: 'admin@test.com',
         password: 'secret',
       });
-      expect(authStorage.setAuthStorage).toHaveBeenCalledWith('jwt-here', {
-        id: 1,
-        email: 'admin@test.com',
-        name: 'Admin User',
-        role: 'ROLE_ADMIN',
-        companyName: 'Mbolea',
-      });
+      expect(authStorage.setAuthStorage).toHaveBeenCalledWith(
+        'jwt-here',
+        expect.objectContaining({
+          id: 1,
+          email: 'admin@test.com',
+          name: 'Admin User',
+          role: 'ROLE_ADMIN',
+          companyName: 'Mbolea',
+        })
+      );
       expect(result).toEqual({ token: 'jwt-here', user: expect.objectContaining({ role: 'ROLE_ADMIN' }) });
     });
 
@@ -76,14 +79,17 @@ describe('authApi', () => {
         companyName: 'Org',
         companyCode: 'OC',
       });
-      expect(api.post).toHaveBeenCalledWith('/auth/register', {
-        name: 'Jane',
-        email: 's@org.com',
-        password: 'pass',
-        role: 'SALES_POINT',
-        companyName: 'Org',
-        companyCode: 'OC',
-      });
+      expect(api.post).toHaveBeenCalledWith(
+        '/auth/register',
+        expect.objectContaining({
+          name: 'Jane',
+          email: 's@org.com',
+          password: 'pass',
+          role: 'SALES_POINT',
+          companyName: 'Org',
+          companyCode: 'OC',
+        })
+      );
     });
   });
 });

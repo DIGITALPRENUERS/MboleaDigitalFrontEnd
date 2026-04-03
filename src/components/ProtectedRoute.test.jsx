@@ -10,11 +10,11 @@ function renderProtectedRoute(authState = {}) {
   return render(
     <MemoryRouter initialEntries={['/app']}>
       <Routes>
+        <Route path="/" element={<div data-testid="home-redirect">Home</div>} />
         <Route element={<ProtectedRoute {...authState} />}>
           <Route path="/app" element={<MockOutlet />} />
         </Route>
         <Route path="/login" element={<div data-testid="login-page">Login</div>} />
-        <Route path="/unauthorized" element={<div data-testid="unauthorized">Unauthorized</div>} />
       </Routes>
     </MemoryRouter>
   );
@@ -67,14 +67,14 @@ describe('ProtectedRoute', () => {
     expect(screen.getByTestId('protected-content')).toBeInTheDocument();
   });
 
-  it('redirects to /unauthorized when user role not in allowedRoles', () => {
+  it('redirects to / when user role not in allowedRoles', () => {
     vi.spyOn(AuthContext, 'useAuth').mockReturnValue({
       user: { id: 1, role: 'ROLE_SALES_POINT' },
       isAuthenticated: true,
       loading: false,
     });
     renderProtectedRoute({ allowedRoles: ['ROLE_ADMIN'] });
-    expect(screen.getByTestId('unauthorized')).toBeInTheDocument();
+    expect(screen.getByTestId('home-redirect')).toBeInTheDocument();
     expect(screen.queryByTestId('protected-content')).not.toBeInTheDocument();
   });
 });

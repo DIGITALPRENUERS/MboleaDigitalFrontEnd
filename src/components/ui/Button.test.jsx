@@ -10,10 +10,10 @@ describe('Button', () => {
   });
 
   it('applies variant and size classes', () => {
-    render(<Button variant="danger" size="lg">Delete</Button>);
+    render(<Button variant="danger" size="md">Delete</Button>);
     const btn = screen.getByRole('button', { name: /Delete/i });
     expect(btn).toHaveClass('bg-red-600');
-    expect(btn).toHaveClass('px-6');
+    expect(btn).toHaveClass('px-4');
   });
 
   it('is disabled when disabled prop is true', () => {

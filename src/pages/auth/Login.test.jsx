@@ -25,20 +25,20 @@ describe('Login', () => {
 
   it('renders sign in form with email and password fields', () => {
     renderLogin();
-    expect(screen.getByRole('heading', { name: /Sign in to the portal/i })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /^Sign in$/i })).toBeInTheDocument();
     expect(screen.getByPlaceholderText('you@example.com')).toBeInTheDocument();
     expect(screen.getByPlaceholderText('••••••••')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Sign In/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^Sign in$/i })).toBeInTheDocument();
   });
 
   it('renders link to signup', () => {
     renderLogin();
-    expect(screen.getByRole('link', { name: /Request access/i })).toHaveAttribute('href', '/signup');
+    expect(screen.getByRole('link', { name: /^Sign up$/i })).toHaveAttribute('href', '/signup');
   });
 
   it('shows validation when submitting empty form', async () => {
     renderLogin();
-    const submit = screen.getByRole('button', { name: /Sign In/i });
+    const submit = screen.getByRole('button', { name: /^Sign in$/i });
     await userEvent.click(submit);
     const email = screen.getByPlaceholderText('you@example.com');
     expect(email).toBeRequired();
