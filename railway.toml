@@ -6,10 +6,10 @@
 # https://docs.railway.com/reference/config-as-code
 
 [build]
-builder = "NIXPACKS"
-# npm install avoids npm ci + BuildKit cache on node_modules/.cache (EBUSY). NODE_ENV=development keeps devDependencies for vite build.
-buildCommand = "NODE_ENV=development npm install && npm run build"
-watchPatterns = ["src/**", "public/**", "index.html", "package.json", "package-lock.json", "vite.config.js", "*.config.js", "tailwind.config.*", "postcss.config.*"]
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile"
+# Custom Dockerfile avoids Railway-generated npm ci + cache mount on node_modules/.cache (EBUSY).
+watchPatterns = ["src/**", "public/**", "index.html", "package.json", "package-lock.json", "vite.config.js", "*.config.js", "tailwind.config.*", "postcss.config.*", "Dockerfile"]
 
 [deploy]
 # Bind 0.0.0.0; Railway sets PORT.
