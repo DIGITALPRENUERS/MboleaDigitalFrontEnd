@@ -1,3 +1,4 @@
-# Pin Node for reproducible Railway / Nixpacks builds
+# Nixpacks (Railway builder = NIXPACKS). Node 22 matches Vite 7 engines.
 [variables]
-NIXPACKS_NODE_VERSION = "20"
+NIXPACKS_NODE_VERSION = "22"
+NPM_CONFIG_CACHE = "/tmp/npm-cache"

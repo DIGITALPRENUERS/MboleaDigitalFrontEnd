@@ -1,13 +1,20 @@
-# Railway: connect the GitHub repo root (this folder). Set VITE_API_BASE_URL at build time
-# to your backend public URL including /api, e.g. https://your-api.up.railway.app/api
+# Mbolea frontend — deploy from this repo root (leave Railway "Root Directory" empty).
+#
+# Variables: set VITE_API_BASE_URL to your public API base (must include /api), e.g.
+#   https://your-backend.up.railway.app/api
+# Mark it available at build time so Vite inlines it.
+#
 # https://docs.railway.com/reference/config-as-code
 
 [build]
 builder = "NIXPACKS"
-buildCommand = "npm ci && npm run build"
+# npm install avoids npm ci + BuildKit cache on node_modules/.cache (EBUSY). NODE_ENV=development keeps devDependencies for vite build.
+buildCommand = "NODE_ENV=development npm install && npm run build"
+watchPatterns = ["src/**", "public/**", "index.html", "package.json", "package-lock.json", "vite.config.js", "*.config.js", "tailwind.config.*", "postcss.config.*"]
 
 [deploy]
-startCommand = "npm run start"
+# Bind 0.0.0.0; Railway sets PORT.
+startCommand = "sh -c 'exec ./node_modules/.bin/serve -s dist -l tcp://0.0.0.0:${PORT:-3000}'"
 restartPolicyType = "ON_FAILURE"
 healthcheckPath = "/"
 healthcheckTimeout = 300
