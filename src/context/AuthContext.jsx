@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import * as authApi from '../services/authApi';
 import { getDashboardPath } from '../config/dashboardRoutes';
@@ -16,33 +16,36 @@ export function AuthProvider({ children }) {
     setLoading(false);
   }, []);
 
-  const login = async (email, password, companyCode) => {
-    try {
-      const { user: u } = await authApi.login(email, password, companyCode);
-      setUser(u);
-      const from = location.state?.from?.pathname;
-      if (from && from !== '/login') {
-        navigate(from, { replace: true });
-      } else {
-        navigate(getDashboardPath(u?.role), { replace: true });
+  const login = useCallback(
+    async (email, password) => {
+      try {
+        const { user: u } = await authApi.login(email, password);
+        setUser(u);
+        const from = location.state?.from?.pathname;
+        if (from && from !== '/login') {
+          navigate(from, { replace: true });
+        } else {
+          navigate(getDashboardPath(u?.role), { replace: true });
+        }
+        return { success: true };
+      } catch (err) {
+        const msg =
+          err.response?.data?.message ??
+          err.response?.data?.error ??
+          err.message ??
+          'Invalid email or password';
+        return { success: false, message: msg };
       }
-      return { success: true };
-    } catch (err) {
-      const msg =
-        err.response?.data?.message ??
-        err.response?.data?.error ??
-        err.message ??
-        'Invalid email or password';
-      return { success: false, message: msg };
-    }
-  };
+    },
+    [navigate, location.state]
+  );
 
-  const logout = () => {
+  const logout = useCallback(() => {
     authApi.logout(); // notify backend (fire-and-forget)
     authApi.setAuthStorage(null, null);
     setUser(null);
     navigate('/login');
-  };
+  }, [navigate]);
 
   return (
     <AuthContext.Provider

@@ -12,7 +12,8 @@ import Modal from '../../components/ui/Modal';
 import StatusBadge from '../../components/common/StatusBadge';
 import OrderHistory from '../../components/orders/OrderHistory';
 import { useToast } from '../../components/ui/Toast';
-import { Package, ListOrdered, Truck, ShoppingBag, History } from 'lucide-react';
+import { Package, ListOrdered, Truck, ShoppingBag, History, Users } from 'lucide-react';
+import AdminUsersPanel from './AdminUsersPanel';
 
 function formatTZS(n) {
   if (n == null) return '—';
@@ -21,7 +22,7 @@ function formatTZS(n) {
 
 export default function AdminDashboard() {
   const toast = useToast();
-  const [activeTab, setActiveTab] = useState('fertilizers');
+  const [activeTab, setActiveTab] = useState('users');
   const [fertilizers, setFertilizers] = useState([]);
   const [catalog, setCatalog] = useState([]);
   const [orders, setOrders] = useState([]);
@@ -135,6 +136,7 @@ export default function AdminDashboard() {
   };
 
   const tabs = [
+    { id: 'users', label: 'Users', icon: Users },
     { id: 'fertilizers', label: 'Fertilizers', icon: Package },
     { id: 'catalog', label: 'Catalog', icon: ShoppingBag },
     { id: 'orders', label: 'Bulk orders', icon: ListOrdered },
@@ -210,6 +212,8 @@ export default function AdminDashboard() {
           </button>
         ))}
       </nav>
+
+      {activeTab === 'users' && <AdminUsersPanel />}
 
       {activeTab === 'fertilizers' && (
         <Card>

@@ -1,6 +1,7 @@
 import { Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { ToastProvider } from './components/ui/Toast';
+import IdleSessionWatcher from './components/IdleSessionWatcher';
 import ProtectedRoute from './components/ProtectedRoute';
 import PortalLayout from './layouts/PortalLayout';
 import LogisticsLayout from './layouts/LogisticsLayout';
@@ -18,6 +19,7 @@ export default function App() {
   return (
     <AuthProvider>
       <ToastProvider>
+        <IdleSessionWatcher />
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<SignUp />} />

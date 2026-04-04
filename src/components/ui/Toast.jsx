@@ -20,6 +20,8 @@ export function ToastProvider({ children }) {
 
   const success = useCallback((msg, d) => add(msg, 'success', d), [add]);
 
+  const info = useCallback((msg, d) => add(msg, 'info', d), [add]);
+
   const error = useCallback((msg, duration = 5000) => {
     const id = Date.now() + Math.random();
     const durationMs = duration ?? 5000;
@@ -36,7 +38,7 @@ export function ToastProvider({ children }) {
   }, [remove]);
 
   return (
-    <ToastContext.Provider value={{ success, error }}>
+    <ToastContext.Provider value={{ success, error, info }}>
       {children}
       {createPortal(
         <div className="fixed top-4 right-4 z-[100] flex flex-col gap-2 max-w-sm" aria-label="Notifications">
@@ -47,10 +49,18 @@ export function ToastProvider({ children }) {
               className={`flex items-start gap-3 rounded-lg border p-4 shadow-lg ${
                 t.type === 'success'
                   ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
-                  : 'border-red-200 bg-red-50 text-red-800'
+                  : t.type === 'info'
+                    ? 'border-slate-200 bg-slate-50 text-slate-800'
+                    : 'border-red-200 bg-red-50 text-red-800'
               } ${t.shakeAt ? 'animate-toast-shake' : ''}`}
             >
-              {t.type === 'success' ? <CheckCircle2 className="size-5 shrink-0" /> : <AlertCircle className="size-5 shrink-0" />}
+              {t.type === 'success' ? (
+                <CheckCircle2 className="size-5 shrink-0" />
+              ) : t.type === 'info' ? (
+                <AlertCircle className="size-5 shrink-0 text-slate-600" />
+              ) : (
+                <AlertCircle className="size-5 shrink-0" />
+              )}
               <p className="flex-1 text-sm font-medium">{t.message}</p>
               <button
                 type="button"
