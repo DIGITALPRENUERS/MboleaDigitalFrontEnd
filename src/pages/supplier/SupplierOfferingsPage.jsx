@@ -5,7 +5,6 @@ import * as supplierOfferingsApi from '../../services/supplierOfferingsApi';
 import * as bulkOrdersApi from '../../services/bulkOrdersApi';
 import * as logisticsApi from '../../services/logisticsApi';
 import * as tfraPricesApi from '../../services/tfraPricesApi';
-import * as tfraReferencePricesApi from '../../services/tfraReferencePricesApi';
 import { withContext } from '../../utils/errorNotifications';
 import { formatDateTime } from '../../utils/dateTime';
 import OrderHistory from '../../components/orders/OrderHistory';
@@ -63,7 +62,6 @@ export default function SupplierOfferingsPage() {
   const [confirmingOrderId, setConfirmingOrderId] = useState(null);
   const [confirmAction, setConfirmAction] = useState(null); // 'own' | 'platform'
   const [tfraPricesByRegion, setTfraPricesByRegion] = useState({});
-  const [tfraReferencePrices, setTfraReferencePrices] = useState([]);
 
   const activeSection = pathname === '/supplier' ? 'dashboard' : pathname === '/supplier/orders' ? 'orders' : 'offerings';
   const sidebarWidth = sidebarCollapsed ? 72 : 224;
@@ -100,11 +98,6 @@ export default function SupplierOfferingsPage() {
       .catch((err) => { setDeliveries([]); toast.error(withContext('Load deliveries', err)); })
       .finally(() => setLoading((l) => ({ ...l, deliveries: false })));
 
-    tfraReferencePricesApi
-      .getReferencePrices()
-      .then(setTfraReferencePrices)
-      .catch(() => setTfraReferencePrices([]));
-
     tfraPricesApi.getLocations().then(setLocationHierarchy).catch(() => setLocationHierarchy({ regions: [] }));
   };
 
@@ -137,17 +130,6 @@ export default function SupplierOfferingsPage() {
     () => orders.filter((o) => (o.tfraStatus === 'APPROVED' || o.tfraStatus === 'REJECTED') && o.hasPayment !== true),
     [orders]
   );
-
-  /** TFRA average price cap by fertilizerType|packageKilos (e.g. "YARA_JAVA|25" -> 15000). Used to show cap and avoid loss margin. */
-  const tfraCapByKey = useMemo(() => {
-    const map = new Map();
-    (tfraReferencePrices || []).forEach((r) => {
-      const type = (r.fertilizerType || '').toUpperCase();
-      const pkg = r.packageKilos != null ? String(r.packageKilos) : '';
-      if (type && pkg) map.set(`${type}|${pkg}`, r.averagePriceTzs);
-    });
-    return map;
-  }, [tfraReferencePrices]);
 
   /** Load TFRA region prices for a region name (for subsidy display). */
   const loadTfraRegion = (regionName) => {
@@ -1091,8 +1073,7 @@ export default function SupplierOfferingsPage() {
               </CardHeader>
               <CardContent>
                 <p className="text-sm text-slate-600 mb-4">
-                  Only YARA_JAVA, SA, and CAN. Package sizes: 5, 10, 25, 50 kg. <strong>Unit price is set automatically</strong> from the
-                  TFRA regulator (standard) for that product. You may add optional <strong>percentage discounts</strong> for specific regions—sales points in those regions see the reduced price.
+                  Only YARA_JAVA, SA, and CAN. Package sizes: 5, 10, 25, 50 kg. Unit pricing is applied automatically by the platform for each product and package. You may add optional <strong>percentage discounts</strong> for specific regions—sales points in those regions see the reduced price.
                 </p>
                 <form onSubmit={handleAdd} className="space-y-4">
                   <div className="flex flex-wrap items-end gap-4">
@@ -1137,19 +1118,9 @@ export default function SupplierOfferingsPage() {
                         className="min-w-[160px]"
                       />
                     </div>
-                    {form.fertilizerId && form.packageKilos && (() => {
-                      const fert = fertilizers.find((f) => String(f.id) === form.fertilizerId);
-                      const code = (fert?.code || '').toUpperCase();
-                      const cap = code && form.packageKilos ? tfraCapByKey.get(`${code}|${form.packageKilos}`) : null;
-                      return cap != null ? (
-                        <p className="text-sm font-medium text-indigo-800 self-end pb-2">
-                          Regulator price (TFRA): {formatTZS(cap)} / bag
-                        </p>
-                      ) : null;
-                    })()}
                   </div>
                   <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-4 space-y-3">
-                    <p className="text-sm font-medium text-slate-800">Optional regional discounts (% off regulator price)</p>
+                    <p className="text-sm font-medium text-slate-800">Optional regional discounts (% for buyers in that region)</p>
                     {(form.regionDiscounts || []).map((row, idx) => (
                       <div key={idx} className="flex flex-wrap items-end gap-2">
                         <div className="min-w-[200px]">

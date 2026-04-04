@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from './ui/Toast';
@@ -11,13 +11,13 @@ const IDLE_TO_WARNING_MS = 30 * 1000;
 /** Countdown duration when warning appears (ms). */
 const COUNTDOWN_INITIAL_MS = 60 * 1000;
 
-/** Hovering the dialog adds this much time (throttled). */
-const EXTEND_MS = 60 * 1000;
+/** Wait this long after the dialog opens before hover can dismiss (avoids instant dismiss if pointer is already over the box). */
+const HOVER_DISMISS_GRACE_MS = 500;
 
-/** Minimum gap between hover extensions. */
-const HOVER_EXTEND_THROTTLE_MS = 2500;
+const ACTIVITY_EVENTS = ['mousedown', 'mousemove', 'keydown', 'scroll', 'touchstart', 'click', 'wheel'];
 
-const ACTIVITY_EVENTS = ['mousedown', 'keydown', 'scroll', 'touchstart', 'click'];
+/** Throttle mousemove so the idle clock is not reset every frame. */
+const MOUSEMOVE_THROTTLE_MS = 1000;
 
 function formatCountdown(ms) {
   if (ms <= 0) return '0:00';
@@ -28,9 +28,11 @@ function formatCountdown(ms) {
 }
 
 /**
- * After 30s idle: show modal with countdown. Hovering the dialog adds +1 min (throttled).
+ * After 30s idle: show modal with countdown. Hovering the dialog dismisses the warning (same as confirming).
  * "Yes, I'm still active" closes the modal and resets idle (fresh 30s before warning).
  * At 0: sign out.
+ *
+ * Uses refs for logout/toast so React re-renders never reset the idle timer (fixes modal never appearing).
  */
 export default function IdleSessionWatcher() {
   const { user, logout } = useAuth();
@@ -42,71 +44,29 @@ export default function IdleSessionWatcher() {
   const warningOpenRef = useRef(false);
   const idleCheckRef = useRef(null);
   const countdownRef = useRef(null);
-  const lastHoverExtendRef = useRef(0);
+  const lastMouseMoveRef = useRef(0);
+  const hoverDismissReadyRef = useRef(false);
+  const logoutRef = useRef(logout);
+  const toastRef = useRef(toast);
+  const armIdleMonitoringRef = useRef(() => {});
+  const onStillActiveRef = useRef(() => {});
 
-  const clearIdleCheck = useCallback(() => {
+  logoutRef.current = logout;
+  toastRef.current = toast;
+
+  const clearIdleCheck = () => {
     if (idleCheckRef.current != null) {
       clearInterval(idleCheckRef.current);
       idleCheckRef.current = null;
     }
-  }, []);
+  };
 
-  const clearCountdown = useCallback(() => {
+  const clearCountdown = () => {
     if (countdownRef.current != null) {
       clearInterval(countdownRef.current);
       countdownRef.current = null;
     }
-  }, []);
-
-  const startCountdown = useCallback(() => {
-    clearCountdown();
-    setRemainingMs(COUNTDOWN_INITIAL_MS);
-    countdownRef.current = window.setInterval(() => {
-      setRemainingMs((prev) => {
-        const next = prev - 1000;
-        if (next <= 0) {
-          clearCountdown();
-          warningOpenRef.current = false;
-          setOpen(false);
-          toast.info('Signed out after inactivity.');
-          logout();
-          return 0;
-        }
-        return next;
-      });
-    }, 1000);
-  }, [clearCountdown, logout, toast]);
-
-  const armIdleMonitor = useCallback(() => {
-    clearIdleCheck();
-    lastActivityRef.current = Date.now();
-    idleCheckRef.current = window.setInterval(() => {
-      if (warningOpenRef.current) return;
-      const idleFor = Date.now() - lastActivityRef.current;
-      if (idleFor >= IDLE_TO_WARNING_MS) {
-        clearIdleCheck();
-        warningOpenRef.current = true;
-        setOpen(true);
-        startCountdown();
-      }
-    }, 500);
-  }, [clearIdleCheck, startCountdown]);
-
-  const onStillActive = useCallback(() => {
-    clearCountdown();
-    warningOpenRef.current = false;
-    setOpen(false);
-    setRemainingMs(COUNTDOWN_INITIAL_MS);
-    lastActivityRef.current = Date.now();
-    armIdleMonitor();
-  }, [armIdleMonitor, clearCountdown]);
-
-  const onModalHoverExtend = useCallback(() => {
-    const now = Date.now();
-    if (now - lastHoverExtendRef.current < HOVER_EXTEND_THROTTLE_MS) return;
-    lastHoverExtendRef.current = now;
-    setRemainingMs((prev) => prev + EXTEND_MS);
-  }, []);
+  };
 
   useEffect(() => {
     if (!user) {
@@ -114,6 +74,7 @@ export default function IdleSessionWatcher() {
       clearCountdown();
       warningOpenRef.current = false;
       setOpen(false);
+      armIdleMonitoringRef.current = () => {};
       return undefined;
     }
 
@@ -122,24 +83,106 @@ export default function IdleSessionWatcher() {
       lastActivityRef.current = Date.now();
     };
 
-    armIdleMonitor();
-    ACTIVITY_EVENTS.forEach((ev) => window.addEventListener(ev, markActivity, { passive: true }));
+    const onMouseMoveThrottled = () => {
+      if (warningOpenRef.current) return;
+      const now = Date.now();
+      if (now - lastMouseMoveRef.current < MOUSEMOVE_THROTTLE_MS) return;
+      lastMouseMoveRef.current = now;
+      lastActivityRef.current = now;
+    };
+
+    const startCountdownInner = () => {
+      clearCountdown();
+      setRemainingMs(COUNTDOWN_INITIAL_MS);
+      countdownRef.current = window.setInterval(() => {
+        setRemainingMs((prev) => {
+          const next = prev - 1000;
+          if (next <= 0) {
+            clearCountdown();
+            warningOpenRef.current = false;
+            setOpen(false);
+            toastRef.current?.info?.('Signed out after inactivity.');
+            logoutRef.current?.();
+            return 0;
+          }
+          return next;
+        });
+      }, 1000);
+    };
+
+    const tryShowWarning = () => {
+      if (warningOpenRef.current) return;
+      if (Date.now() - lastActivityRef.current < IDLE_TO_WARNING_MS) return;
+      clearIdleCheck();
+      warningOpenRef.current = true;
+      setOpen(true);
+      startCountdownInner();
+    };
+
+    const armIdleMonitoring = () => {
+      clearIdleCheck();
+      lastActivityRef.current = Date.now();
+      idleCheckRef.current = window.setInterval(tryShowWarning, 500);
+    };
+
+    armIdleMonitoringRef.current = armIdleMonitoring;
+    armIdleMonitoring();
+
+    ACTIVITY_EVENTS.forEach((ev) => {
+      const handler = ev === 'mousemove' ? onMouseMoveThrottled : markActivity;
+      window.addEventListener(ev, handler, { passive: true });
+    });
 
     return () => {
       clearIdleCheck();
       clearCountdown();
-      ACTIVITY_EVENTS.forEach((ev) => window.removeEventListener(ev, markActivity));
+      armIdleMonitoringRef.current = () => {};
+      ACTIVITY_EVENTS.forEach((ev) => {
+        const handler = ev === 'mousemove' ? onMouseMoveThrottled : markActivity;
+        window.removeEventListener(ev, handler);
+      });
     };
-  }, [user, armIdleMonitor, clearIdleCheck, clearCountdown]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only re-arm when user identity changes; avoids timer reset on context updates
+  }, [user]);
+
+  const onStillActive = () => {
+    onStillActiveRef.current();
+  };
+
+  onStillActiveRef.current = () => {
+    clearCountdown();
+    warningOpenRef.current = false;
+    hoverDismissReadyRef.current = false;
+    setOpen(false);
+    setRemainingMs(COUNTDOWN_INITIAL_MS);
+    armIdleMonitoringRef.current?.();
+  };
+
+  useEffect(() => {
+    if (!open) {
+      hoverDismissReadyRef.current = false;
+      return undefined;
+    }
+    hoverDismissReadyRef.current = false;
+    const t = window.setTimeout(() => {
+      hoverDismissReadyRef.current = true;
+    }, HOVER_DISMISS_GRACE_MS);
+    return () => window.clearTimeout(t);
+  }, [open]);
+
+  const onModalPointerEnter = () => {
+    if (!hoverDismissReadyRef.current) return;
+    onStillActiveRef.current();
+  };
 
   useEffect(() => {
     if (!user || !open) return undefined;
     const onKey = (e) => {
-      if (e.key === 'Escape') onStillActive();
+      if (e.key === 'Escape') onStillActiveRef.current();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [user, open, onStillActive]);
+  }, [user, open]);
 
   if (!user || !open) return null;
 
@@ -148,7 +191,7 @@ export default function IdleSessionWatcher() {
       <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" aria-hidden />
       <div
         className="relative w-full max-w-md rounded-2xl border border-amber-200 bg-white p-6 shadow-2xl shadow-amber-900/10"
-        onMouseEnter={onModalHoverExtend}
+        onPointerEnter={onModalPointerEnter}
         role="alertdialog"
         aria-labelledby="idle-session-title"
         aria-describedby="idle-session-desc"
@@ -168,7 +211,7 @@ export default function IdleSessionWatcher() {
               {formatCountdown(remainingMs)}
             </p>
             <p className="mt-2 text-center text-xs text-slate-500">
-              Move the pointer over this dialog to add 1 minute (throttled). Or confirm below.
+              Move the pointer over this dialog to stay signed in, or use the button below.
             </p>
             <div className="mt-6 flex flex-wrap justify-end gap-2">
               <Button type="button" variant="secondary" onClick={onStillActive}>

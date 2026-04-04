@@ -299,29 +299,42 @@ export default function AdminDashboard() {
             ) : catalog.length === 0 ? (
               <p className="text-slate-500">No offerings.</p>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-sm">
-                  <thead>
-                    <tr className="border-b border-slate-200 text-slate-600">
-                      <th className="pb-2 font-medium">Product</th>
-                      <th className="pb-2 font-medium">Code</th>
-                      <th className="pb-2 font-medium">Package (kg)</th>
-                      <th className="pb-2 font-medium">Price (TZS)</th>
-                      <th className="pb-2 font-medium">Supplier</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {catalog.map((o) => (
-                      <tr key={o.id} className="border-b border-slate-100">
-                        <td className="py-2 font-medium">{o.fertilizerName}</td>
-                        <td className="py-2">{o.fertilizerCode ?? '—'}</td>
-                        <td className="py-2">{o.packageKilos ?? '—'}</td>
-                        <td className="py-2">{formatTZS(o.unitPrice)}</td>
-                        <td className="py-2">{o.supplierCompanyName || o.supplierName || '—'}</td>
+              <div className="space-y-3">
+                <p className="text-xs text-slate-500">
+                  Prices follow TFRA regulator standards; effective column uses your admin region when set (otherwise no regional discount).
+                </p>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-sm">
+                    <thead>
+                      <tr className="border-b border-slate-200 text-slate-600">
+                        <th className="pb-2 font-medium">Product</th>
+                        <th className="pb-2 font-medium">Code</th>
+                        <th className="pb-2 font-medium">Pkg (kg)</th>
+                        <th className="pb-2 font-medium">Regulator (TFRA)</th>
+                        <th className="pb-2 font-medium">Discount %</th>
+                        <th className="pb-2 font-medium">Effective (TZS)</th>
+                        <th className="pb-2 font-medium">Supplier</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {catalog.map((o) => (
+                        <tr key={o.id} className="border-b border-slate-100">
+                          <td className="py-2 font-medium">{o.fertilizerName}</td>
+                          <td className="py-2">{o.fertilizerCode ?? '—'}</td>
+                          <td className="py-2">{o.packageKilos ?? '—'}</td>
+                          <td className="py-2">{formatTZS(o.regulatorPriceTzs ?? o.unitPrice)}</td>
+                          <td className="py-2">
+                            {o.discountPercentApplied != null && Number(o.discountPercentApplied) > 0
+                              ? `${Number(o.discountPercentApplied)}%`
+                              : '—'}
+                          </td>
+                          <td className="py-2 font-medium text-emerald-800">{formatTZS(o.unitPrice)}</td>
+                          <td className="py-2">{o.supplierCompanyName || o.supplierName || '—'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             )}
           </CardContent>

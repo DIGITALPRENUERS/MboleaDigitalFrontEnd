@@ -2,6 +2,8 @@ import { createContext, useContext, useState, useEffect, useCallback } from 'rea
 import { useNavigate, useLocation } from 'react-router-dom';
 import * as authApi from '../services/authApi';
 import { getDashboardPath } from '../config/dashboardRoutes';
+import IdleSessionWatcher from '../components/IdleSessionWatcher';
+import { ToastProvider } from '../components/ui/Toast';
 
 const AuthContext = createContext(null);
 
@@ -57,7 +59,11 @@ export function AuthProvider({ children }) {
         isAuthenticated: !!user,
       }}
     >
-      {!loading && children}
+      <ToastProvider>
+        {/* Inactivity warning for all logged-in roles; inside ToastProvider for useToast */}
+        <IdleSessionWatcher />
+        {!loading && children}
+      </ToastProvider>
     </AuthContext.Provider>
   );
 }
