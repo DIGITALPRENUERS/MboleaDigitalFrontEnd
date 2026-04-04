@@ -1,0 +1,15 @@
+# Processed by nginx Docker entrypoint (envsubst). Railway sets PORT.
+server {
+    listen       ${PORT};
+    server_name  localhost;
+    root   /usr/share/nginx/html;
+    index  index.html;
+
+    location = /favicon.ico {
+        return 302 /logo.svg;
+    }
+
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+}

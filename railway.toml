@@ -9,12 +9,10 @@
 builder = "DOCKERFILE"
 dockerfilePath = "Dockerfile"
 # Custom Dockerfile avoids Railway-generated npm ci + cache mount on node_modules/.cache (EBUSY).
-watchPatterns = ["src/**", "public/**", "scripts/**", "index.html", "package.json", "package-lock.json", "vite.config.js", "*.config.js", "tailwind.config.*", "postcss.config.*", "Dockerfile"]
+watchPatterns = ["src/**", "public/**", "scripts/**", "nginx/**", "index.html", "package.json", "package-lock.json", "vite.config.js", "*.config.js", "tailwind.config.*", "postcss.config.*", "Dockerfile"]
 
 [deploy]
-# Use Dockerfile CMD: node scripts/static-server.mjs — listens on 0.0.0.0:$PORT (Railway injects PORT).
-# Public domain "target port" must match deploy logs (e.g. Listening on ...:8080 → use 8080, not 3000).
-# If you still see 502 / "Application failed to respond", check public domain target port matches $PORT:
+# Runtime image is nginx; listen port comes from $PORT (see nginx/default.conf.template). Match public domain target port to that.
 # https://docs.railway.com/networking/troubleshooting/application-failed-to-respond
 restartPolicyType = "ON_FAILURE"
 healthcheckPath = "/"

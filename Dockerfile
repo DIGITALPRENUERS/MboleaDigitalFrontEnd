@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-# Avoid npm cache under node_modules/.cache — Railway's generated builds use a cache mount there and hit EBUSY with npm ci.
+# Build SPA, then serve with nginx (HTTP/1.1) — reliable behind Railway’s edge; avoids Node proxy quirks + 502s.
 FROM node:22-alpine AS build
 WORKDIR /app
 ENV NPM_CONFIG_CACHE=/tmp/npm-cache
@@ -10,18 +10,11 @@ RUN npm ci
 COPY . .
 RUN npm run build
 
-FROM node:22-alpine AS runtime
-WORKDIR /app
-ENV NODE_ENV=production \
-    NPM_CONFIG_CACHE=/tmp/npm-cache
+FROM nginx:alpine AS runtime
+COPY --from=build /app/dist /usr/share/nginx/html
+COPY nginx/default.conf.template /etc/nginx/templates/default.conf.template
 
-COPY package.json package-lock.json ./
-RUN npm ci --omit=dev && npm cache clean --force
-
-COPY scripts/static-server.mjs ./scripts/static-server.mjs
-COPY --from=build /app/dist ./dist
-
-# HTTP/1.1 via node:http (see scripts/static-server.mjs). Listen port = $PORT (Railway sets this, often 8080).
-# EXPOSE is only a hint; do not set Railway public "target port" to 3000 unless logs show PORT=3000.
+# Railway injects PORT at runtime; nginx entrypoint runs envsubst on templates.
+# https://docs.railway.com/networking/troubleshooting/application-failed-to-respond
 EXPOSE 8080
-CMD ["node", "scripts/static-server.mjs"]
+CMD ["nginx", "-g", "daemon off;"]
