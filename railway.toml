@@ -9,11 +9,10 @@
 builder = "DOCKERFILE"
 dockerfilePath = "Dockerfile"
 # Custom Dockerfile avoids Railway-generated npm ci + cache mount on node_modules/.cache (EBUSY).
-watchPatterns = ["src/**", "public/**", "index.html", "package.json", "package-lock.json", "vite.config.js", "*.config.js", "tailwind.config.*", "postcss.config.*", "Dockerfile"]
+watchPatterns = ["src/**", "public/**", "scripts/**", "index.html", "package.json", "package-lock.json", "vite.config.js", "*.config.js", "tailwind.config.*", "postcss.config.*", "Dockerfile"]
 
 [deploy]
-# Bind 0.0.0.0; Railway sets PORT.
-startCommand = "sh -c 'exec ./node_modules/.bin/serve -s dist -l tcp://0.0.0.0:${PORT:-3000}'"
+# Use Dockerfile CMD: node scripts/static-server.mjs (HTTP/1.1). Do not override startCommand unless you know the implications.
 restartPolicyType = "ON_FAILURE"
 healthcheckPath = "/"
 healthcheckTimeout = 300

@@ -18,7 +18,9 @@ ENV NODE_ENV=production \
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev && npm cache clean --force
 
+COPY scripts/static-server.mjs ./scripts/static-server.mjs
 COPY --from=build /app/dist ./dist
 
+# HTTP/1.1 via node:http (see scripts/static-server.mjs) — required for Railway’s proxy; `serve` CLI uses HTTP/2 and causes 502.
 EXPOSE 3000
-CMD ["sh", "-c", "exec ./node_modules/.bin/serve -s dist -l tcp://0.0.0.0:${PORT:-3000}"]
+CMD ["node", "scripts/static-server.mjs"]
