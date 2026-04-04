@@ -4,7 +4,7 @@ import * as catalogApi from '../../services/catalogApi';
 import * as bulkOrdersApi from '../../services/bulkOrdersApi';
 import * as paymentsApi from '../../services/paymentsApi';
 import * as logisticsApi from '../../services/logisticsApi';
-import * as tfraPricesApi from '../../services/tfraPricesApi';
+import * as supplierRatingsApi from '../../services/supplierRatingsApi';
 import { withContext } from '../../utils/errorNotifications';
 import { formatDateTime } from '../../utils/dateTime';
 import { useAuth } from '../../context/AuthContext';
@@ -62,34 +62,6 @@ function generateControlNumber(orderId) {
   return `991${base}${suffix}`;
 }
 
-/** Build list of { fertilizer_type, package_kilos, selling_price_tzs } from region data for one district/ward. */
-function getTfraFertilizersForWard(regionData, districtName, wardName) {
-  if (!regionData?.districts) return [];
-  const district = regionData.districts.find((d) => d.district_name === districtName);
-  if (!district?.wards) return [];
-  const ward = district.wards.find((w) => w.ward_name === wardName);
-  if (!ward?.sales_points?.length) return [];
-  const out = [];
-  const seen = new Set();
-  for (const sp of ward.sales_points) {
-    for (const f of sp.fertilizers || []) {
-      const type = f.fertilizer_type;
-      for (const pkg of f.packages || []) {
-        const key = `${type}|${pkg.package_kilos}`;
-        if (!seen.has(key)) {
-          seen.add(key);
-          out.push({
-            fertilizer_type: type,
-            package_kilos: pkg.package_kilos,
-            selling_price_tzs: pkg.selling_price_tzs,
-          });
-        }
-      }
-    }
-  }
-  return out;
-}
-
 const SIDEBAR_SECTIONS = [
   { id: 'dashboard', path: '/sales-point', label: 'Dashboard', icon: LayoutGrid },
   { id: 'catalog', path: '/sales-point/catalog', label: 'Catalog', icon: Package },
@@ -124,8 +96,8 @@ export default function SalesPointDashboard() {
   const [payments, setPayments] = useState([]);
   const [deliveries, setDeliveries] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
-  const [tfraLocationFertilizers, setTfraLocationFertilizers] = useState([]);
-  const [loading, setLoading] = useState({ catalog: true, orders: true, payments: true, deliveries: true, suppliers: true, tfra: false });
+  const [supplierRatingSummaries, setSupplierRatingSummaries] = useState({});
+  const [loading, setLoading] = useState({ catalog: true, orders: true, payments: true, deliveries: true, suppliers: true });
   const [catalogSearch, setCatalogSearch] = useState('');
   const [cart, setCart] = useState([]);
   const [orderSupplierId, setOrderSupplierId] = useState(null);
@@ -148,24 +120,14 @@ export default function SalesPointDashboard() {
   const hasLocation = !!(user?.region && user?.district && user?.ward);
 
   useEffect(() => {
-    if (!hasLocation) {
-      setTfraLocationFertilizers([]);
-      return;
-    }
-    setLoading((l) => ({ ...l, tfra: true }));
-    tfraPricesApi.getRegion(user.region).then((regionData) => {
-      const list = getTfraFertilizersForWard(regionData, user.district, user.ward);
-      setTfraLocationFertilizers(list);
-    }).catch(() => setTfraLocationFertilizers([])).finally(() => setLoading((l) => ({ ...l, tfra: false })));
-  }, [user?.region, user?.district, user?.ward, hasLocation]);
-
-  const tfraMaxByKey = useMemo(() => {
-    const map = new Map();
-    tfraLocationFertilizers.forEach(({ fertilizer_type, package_kilos, selling_price_tzs }) => {
-      map.set(`${String(fertilizer_type).toUpperCase()}|${Number(package_kilos)}`, selling_price_tzs);
+    const ids = [...new Set(offerings.map((o) => o.supplierUserId).filter(Boolean))];
+    ids.forEach((id) => {
+      supplierRatingsApi
+        .getSupplierRatingSummary(id)
+        .then((s) => setSupplierRatingSummaries((prev) => ({ ...prev, [id]: s })))
+        .catch(() => {});
     });
-    return map;
-  }, [tfraLocationFertilizers]);
+  }, [offerings]);
 
   const loadCatalog = () => {
     setLoading((l) => ({ ...l, catalog: true }));
@@ -283,24 +245,52 @@ export default function SalesPointDashboard() {
     return list;
   }, [offerings, catalogSearch, filterSupplierId, filterFertilizerType, filterKg]);
 
+  /** First click adds the line; a second click on the same product shows a warning (use +/− to change quantity). */
   const addToCart = (offering, quantity = 1) => {
+    const alreadyInCart = cart.some((c) => c.offering.id === offering.id);
+    if (alreadyInCart) {
+      toast.warning(
+        'This item is already in your cart. Use + or − on the product card or in the cart below to change quantity.'
+      );
+      return;
+    }
     const q = Math.max(1, Number(quantity));
-    setCart((prev) => {
-      const existing = prev.find((c) => c.offering.id === offering.id);
-      if (existing) {
-        return prev.map((c) => (c.offering.id === offering.id ? { ...c, quantity: c.quantity + q } : c));
-      }
-      return [...prev, { offering, quantity: q }];
-    });
-    setCatalogQuantity((prev) => ({ ...prev, [offering.id]: 1 }));
+    setCart((prev) => [...prev, { offering, quantity: q }]);
+    setCatalogQuantity((prev) => ({ ...prev, [offering.id]: q }));
     toast.success(`Added ${offering.fertilizerName} (${offering.packageKilos ?? '?'} kg) to cart`);
   };
 
   const getCatalogQty = (offeringId) => Math.max(1, catalogQuantity[offeringId] ?? 1);
-  const setCatalogQty = (offeringId, value) => setCatalogQuantity((prev) => ({ ...prev, [offeringId]: Math.max(1, value) }));
+  const setCatalogQty = (offeringId, value) =>
+    setCatalogQuantity((prev) => ({ ...prev, [offeringId]: Math.max(1, value) }));
+
+  /** Change quantity for an item already in cart, or adjust catalog-only quantity before first add. */
+  const adjustQuantityForOffering = (offering, delta) => {
+    const line = cart.find((c) => c.offering.id === offering.id);
+    if (line) {
+      const q = line.quantity + delta;
+      if (q < 1) {
+        setCart((prev) => prev.filter((c) => c.offering.id !== offering.id));
+        setCatalogQuantity((prev) => ({ ...prev, [offering.id]: 1 }));
+        return;
+      }
+      setCart((prev) =>
+        prev.map((c) => (c.offering.id === offering.id ? { ...c, quantity: q } : c))
+      );
+      setCatalogQuantity((prev) => ({ ...prev, [offering.id]: q }));
+    } else {
+      setCatalogQty(offering.id, getCatalogQty(offering.id) + delta);
+    }
+  };
+
+  const adjustQuantityByOfferingId = (offeringId, delta) => {
+    const line = cart.find((c) => c.offering.id === offeringId);
+    if (line) adjustQuantityForOffering(line.offering, delta);
+  };
 
   const removeFromCart = (offeringId) => {
     setCart((prev) => prev.filter((c) => c.offering.id !== offeringId));
+    setCatalogQuantity((prev) => ({ ...prev, [offeringId]: 1 }));
   };
 
   const cartBySupplier = useMemo(() => {
@@ -317,6 +307,7 @@ export default function SalesPointDashboard() {
         quantity,
         unitPrice: offering.unitPrice ?? 0,
         offeringId: offering.id,
+        supplierOfferingId: offering.id,
         fertilizerName: offering.fertilizerName,
         packageKilos: offering.packageKilos,
       });
@@ -350,6 +341,7 @@ export default function SalesPointDashboard() {
         lines: selected.lines.map((l) => ({
           fertilizerId: l.fertilizerId,
           quantity: l.quantity,
+          supplierOfferingId: l.supplierOfferingId ?? l.offeringId,
           unitPrice: l.unitPrice,
           packageKilos: l.packageKilos != null ? l.packageKilos : undefined,
         })),
@@ -873,7 +865,7 @@ export default function SalesPointDashboard() {
             {/* Header */}
             <div className="rounded-2xl bg-gradient-to-r from-emerald-700 to-teal-800 px-6 py-5 shadow-sm">
               <h1 className="text-2xl font-semibold tracking-tight text-white">Catalog</h1>
-              <p className="mt-1 text-sm text-emerald-100">Offers from existing suppliers. Products and prices are from supplier offerings, not TFRA data. TFRA caps are shown for reference only.</p>
+              <p className="mt-1 text-sm text-emerald-100">Offers from suppliers. Prices follow the TFRA regulator standard, with optional regional discounts set by each supplier.</p>
             </div>
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div className="relative w-full sm:w-80 sm:ml-auto">
@@ -940,15 +932,14 @@ export default function SalesPointDashboard() {
               )}
             </div>
 
-            {/* TFRA reference only (not the source of catalog data) */}
-            {hasLocation && (
-              <div className="rounded-xl border border-slate-200 bg-slate-50/80 px-4 py-3">
-                <p className="text-sm text-slate-600">
-                  <span className="font-medium text-slate-700">Reference:</span> TFRA indicative max prices at your location ({locationLabel}) are shown on each product for comparison. Catalog products and prices come from supplier offerings below.
-                </p>
-                {loading.tfra && <p className="mt-2 text-xs text-slate-500">Loading TFRA reference…</p>}
-              </div>
-            )}
+            <div className="rounded-xl border border-slate-200 bg-slate-50/80 px-4 py-3">
+              <p className="text-sm text-slate-600">
+                <span className="font-medium text-slate-700">Pricing:</span> Each product shows the <strong>TFRA regulator</strong> (standard) price and your <strong>effective price</strong> after any supplier discount for your region. You can rate suppliers below each product.
+                {hasLocation && (
+                  <span className="block mt-1 text-xs text-slate-500">Your region: {locationLabel}</span>
+                )}
+              </p>
+            </div>
 
             {/* Product grid – from supplier offerings API */}
             {loading.catalog ? (
@@ -972,11 +963,17 @@ export default function SalesPointDashboard() {
             ) : (
               <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
                 {filteredOfferings.map((o) => {
-                  const pkgKilos = o.packageKilos != null ? Number(o.packageKilos) : null;
-                  const codeUpper = (o.fertilizerCode || '').toUpperCase();
-                  const tfraMax = codeUpper && pkgKilos != null ? tfraMaxByKey.get(`${codeUpper}|${pkgKilos}`) ?? tfraMaxByKey.get(`${(o.fertilizerName || '').toUpperCase()}|${pkgKilos}`) : null;
-                  const overTfra = tfraMax != null && (o.unitPrice != null && Number(o.unitPrice) > Number(tfraMax));
-                  const qty = getCatalogQty(o.id);
+                  const regulator = o.regulatorPriceTzs != null ? Number(o.regulatorPriceTzs) : null;
+                  const effective = o.unitPrice != null ? Number(o.unitPrice) : null;
+                  const discountPct = o.discountPercentApplied != null ? Number(o.discountPercentApplied) : 0;
+                  const overTfra =
+                    regulator != null && effective != null && effective > regulator + 0.5;
+                  const cartLine = cart.find((c) => c.offering.id === o.id);
+                  const qty = cartLine ? cartLine.quantity : getCatalogQty(o.id);
+                  const sum = supplierRatingSummaries[o.supplierUserId];
+                  const showSupplierRatingUi =
+                    filteredOfferings.findIndex((x) => x.supplierUserId === o.supplierUserId) ===
+                    filteredOfferings.findIndex((x) => x.id === o.id);
                   return (
                     <article
                       key={o.id}
@@ -993,29 +990,82 @@ export default function SalesPointDashboard() {
                           <h3 className="mt-3 font-semibold text-slate-900 truncate">{o.fertilizerName}</h3>
                           <p className="mt-0.5 text-xs text-slate-500">{o.fertilizerCode ?? '—'}</p>
                           <p className="mt-2 text-sm text-slate-600">{o.supplierCompanyName || o.supplierName || 'Unknown company'}</p>
+                          {showSupplierRatingUi && sum && sum.ratingCount > 0 && (
+                            <p className="mt-1 text-xs text-amber-800">
+                              Supplier rating: {Number(sum.averageStars).toFixed(1)} ★ ({sum.ratingCount} reviews)
+                            </p>
+                          )}
+                          {showSupplierRatingUi && (
+                            <>
+                              <p className="mt-2 text-xs text-slate-500">Rate this supplier</p>
+                              <div className="mt-1 flex gap-0.5" role="group" aria-label="Rate supplier">
+                                {[1, 2, 3, 4, 5].map((st) => (
+                                  <button
+                                    key={st}
+                                    type="button"
+                                    className="rounded px-1 text-lg leading-none text-amber-400 hover:text-amber-600"
+                                    title={`${st} star${st > 1 ? 's' : ''}`}
+                                    onClick={() => {
+                                      supplierRatingsApi
+                                        .upsertRating({ supplierUserId: o.supplierUserId, stars: st, comment: null })
+                                        .then(() => {
+                                          toast.success('Thanks — your rating was saved.');
+                                          return supplierRatingsApi.getSupplierRatingSummary(o.supplierUserId);
+                                        })
+                                        .then((s) =>
+                                          setSupplierRatingSummaries((prev) => ({ ...prev, [o.supplierUserId]: s }))
+                                        )
+                                        .catch((err) => toast.error(withContext('Save rating', err)));
+                                    }}
+                                  >
+                                    ★
+                                  </button>
+                                ))}
+                              </div>
+                            </>
+                          )}
                         </div>
                       </div>
                       <div className="mt-4 flex items-end justify-between gap-3">
                         <div>
                           <p className="text-xl font-bold text-emerald-700">{formatTZS(o.unitPrice)}</p>
-                          {tfraMax != null && (
-                            <p className={`text-xs mt-0.5 ${overTfra ? 'text-amber-600 font-medium' : 'text-slate-500'}`}>
-                              TFRA max {formatTZS(tfraMax)}
-                              {overTfra && ' · above max'}
-                            </p>
+                          <p className="text-xs mt-0.5 text-slate-500">
+                            Regulator (TFRA): {regulator != null ? formatTZS(regulator) : '—'}
+                            {discountPct > 0 && (
+                              <span className="text-emerald-700 font-medium"> · {discountPct}% off in your region</span>
+                            )}
+                          </p>
+                          {overTfra && (
+                            <p className="text-xs mt-0.5 text-amber-600 font-medium">Above TFRA regulator — cannot add</p>
                           )}
                         </div>
                         <div className="flex items-center gap-1 rounded-xl border border-slate-200 bg-slate-50/80 p-1">
-                          <button type="button" onClick={() => setCatalogQty(o.id, qty - 1)} className="flex size-8 items-center justify-center rounded-lg text-slate-600 hover:bg-slate-200/80 hover:text-slate-900" aria-label="Decrease quantity">
+                          <button
+                            type="button"
+                            onClick={() => adjustQuantityForOffering(o, -1)}
+                            className="flex size-8 items-center justify-center rounded-lg text-slate-600 hover:bg-slate-200/80 hover:text-slate-900"
+                            aria-label="Decrease quantity"
+                          >
                             <Minus className="size-4" />
                           </button>
                           <span className="min-w-[2rem] text-center text-sm font-medium text-slate-800">{qty}</span>
-                          <button type="button" onClick={() => setCatalogQty(o.id, qty + 1)} className="flex size-8 items-center justify-center rounded-lg text-slate-600 hover:bg-slate-200/80 hover:text-slate-900" aria-label="Increase quantity">
+                          <button
+                            type="button"
+                            onClick={() => adjustQuantityForOffering(o, 1)}
+                            className="flex size-8 items-center justify-center rounded-lg text-slate-600 hover:bg-slate-200/80 hover:text-slate-900"
+                            aria-label="Increase quantity"
+                          >
                             <Plus className="size-4" />
                           </button>
                         </div>
                       </div>
-                      <Button size="sm" className="mt-4 w-full rounded-xl" onClick={() => addToCart(o, qty)} disabled={overTfra} title={overTfra ? 'Price exceeds TFRA max for your location' : undefined}>
+                      <Button
+                        size="sm"
+                        className="mt-4 w-full rounded-xl"
+                        onClick={() => addToCart(o, qty)}
+                        disabled={overTfra}
+                        title={overTfra ? 'Price exceeds TFRA standard maximum for this package' : undefined}
+                      >
                         <ShoppingCart className="size-4" /> Add to cart
                       </Button>
                     </article>
@@ -1041,11 +1091,50 @@ export default function SalesPointDashboard() {
                     return (
                       <div key={supplierUserId} className="rounded-xl border border-emerald-200/80 bg-white p-4">
                         <p className="font-medium text-slate-800">{supplierName}</p>
-                        <ul className="mt-3 space-y-2">
-                          {lines.map((l, i) => (
-                            <li key={i} className="flex items-center justify-between text-sm text-slate-600">
-                              <span>{l.fertilizerName} × {l.quantity} {l.packageKilos != null ? `(${l.packageKilos} kg)` : ''}</span>
-                              <span className="font-medium text-slate-800">{formatTZS(l.unitPrice != null && l.quantity ? l.unitPrice * l.quantity : null)}</span>
+                        <ul className="mt-3 space-y-3">
+                          {lines.map((l) => (
+                            <li
+                              key={l.offeringId}
+                              className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-100 bg-slate-50/50 px-3 py-2 text-sm text-slate-600"
+                            >
+                              <div className="min-w-0 flex-1">
+                                <span className="font-medium text-slate-800">{l.fertilizerName}</span>
+                                {l.packageKilos != null && (
+                                  <span className="ml-1 text-slate-500">({l.packageKilos} kg)</span>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-0.5 rounded-lg border border-slate-200 bg-white p-0.5">
+                                  <button
+                                    type="button"
+                                    onClick={() => adjustQuantityByOfferingId(l.offeringId, -1)}
+                                    className="flex size-7 items-center justify-center rounded-md text-slate-600 hover:bg-slate-100"
+                                    aria-label="Decrease quantity in cart"
+                                  >
+                                    <Minus className="size-4" />
+                                  </button>
+                                  <span className="min-w-[1.75rem] text-center text-sm font-semibold text-slate-900">{l.quantity}</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => adjustQuantityByOfferingId(l.offeringId, 1)}
+                                    className="flex size-7 items-center justify-center rounded-md text-slate-600 hover:bg-slate-100"
+                                    aria-label="Increase quantity in cart"
+                                  >
+                                    <Plus className="size-4" />
+                                  </button>
+                                </div>
+                                <span className="min-w-[5rem] text-right font-medium text-slate-800">
+                                  {formatTZS(l.unitPrice != null && l.quantity ? l.unitPrice * l.quantity : null)}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => removeFromCart(l.offeringId)}
+                                  className="rounded-md p-1.5 text-slate-500 hover:bg-red-50 hover:text-red-700"
+                                  aria-label="Remove line"
+                                >
+                                  <Trash2 className="size-4" />
+                                </button>
+                              </div>
                             </li>
                           ))}
                         </ul>

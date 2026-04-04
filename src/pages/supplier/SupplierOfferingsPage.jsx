@@ -46,11 +46,17 @@ export default function SupplierOfferingsPage() {
   const [orders, setOrders] = useState([]);
   const [deliveries, setDeliveries] = useState([]);
   const [loading, setLoading] = useState({ fertilizers: true, offerings: true, orders: true, deliveries: true });
-  const [form, setForm] = useState({ fertilizerId: '', unitPrice: '', packageKilos: '', availableStock: '' });
+  const [form, setForm] = useState({
+    fertilizerId: '',
+    packageKilos: '',
+    availableStock: '',
+    regionDiscounts: [],
+  });
+  const [locationHierarchy, setLocationHierarchy] = useState({ regions: [] });
   const [submitting, setSubmitting] = useState(false);
   const [editingId, setEditingId] = useState(null);
-  const [editPrice, setEditPrice] = useState('');
   const [editStock, setEditStock] = useState('');
+  const [editRegionDiscounts, setEditRegionDiscounts] = useState([]);
   const [expandedOrderId, setExpandedOrderId] = useState(null);
   const [confirmingRemoveId, setConfirmingRemoveId] = useState(null);
   /** When set, we're confirming this order; value is 'own' | 'platform' for which button is loading. */
@@ -98,6 +104,8 @@ export default function SupplierOfferingsPage() {
       .getReferencePrices()
       .then(setTfraReferencePrices)
       .catch(() => setTfraReferencePrices([]));
+
+    tfraPricesApi.getLocations().then(setLocationHierarchy).catch(() => setLocationHierarchy({ regions: [] }));
   };
 
   useEffect(() => {
@@ -232,26 +240,37 @@ export default function SupplierOfferingsPage() {
       .slice(0, 8);
   }, [orders]);
 
+  const regionNameOptions = useMemo(
+    () => (locationHierarchy.regions || []).map((r) => r.region_name).filter(Boolean),
+    [locationHierarchy]
+  );
+
   const handleAdd = async (e) => {
     e.preventDefault();
     const fertilizerId = Number(form.fertilizerId);
     const packageKilos = form.packageKilos ? Number(form.packageKilos) : null;
-    const unitPrice = Number(form.unitPrice);
     const availableStock = form.availableStock === '' ? null : Number(form.availableStock);
-    if (!fertilizerId || !packageKilos || unitPrice < 0 || availableStock == null || availableStock < 0) {
-      toast.error('Select fertilizer, package size (5, 10, 25, or 50 kg), enter price in TZS, and available stock (>= 0).');
+    if (!fertilizerId || !packageKilos || availableStock == null || availableStock < 0) {
+      toast.error('Select fertilizer, package size, and available stock (>= 0). Price follows TFRA regulator automatically.');
       return;
     }
+    const regionDiscounts = (form.regionDiscounts || [])
+      .filter((row) => row.regionName && row.discountPercent !== '' && row.discountPercent != null)
+      .map((row) => ({
+        regionName: String(row.regionName).trim(),
+        discountPercent: Number(row.discountPercent),
+      }))
+      .filter((row) => !Number.isNaN(row.discountPercent) && row.discountPercent >= 0 && row.discountPercent <= 100);
     setSubmitting(true);
     try {
       await supplierOfferingsApi.createOffering({
         fertilizerId,
         packageKilos,
-        unitPrice,
         availableStock,
+        regionDiscounts: regionDiscounts.length ? regionDiscounts : undefined,
       });
-      toast.success('Fertilizer added. Price must not exceed TFRA standard (TZS).');
-      setForm({ fertilizerId: '', unitPrice: '', packageKilos: '', availableStock: '' });
+      toast.success('Offering added. Unit price is set from the TFRA regulator; regional discounts apply for selected regions.');
+      setForm({ fertilizerId: '', packageKilos: '', availableStock: '', regionDiscounts: [] });
       load();
     } catch (err) {
       toast.error(withContext('Add offering', err));
@@ -261,13 +280,21 @@ export default function SupplierOfferingsPage() {
   };
 
   const handleUpdate = async (id) => {
-    const unitPrice = Number(editPrice);
     const availableStock = editStock === '' ? null : Number(editStock);
-    if (unitPrice < 0) return;
     if (availableStock != null && availableStock < 0) return;
+    const regionDiscounts = (editRegionDiscounts || [])
+      .filter((row) => row.regionName && row.discountPercent !== '' && row.discountPercent != null)
+      .map((row) => ({
+        regionName: String(row.regionName).trim(),
+        discountPercent: Number(row.discountPercent),
+      }))
+      .filter((row) => !Number.isNaN(row.discountPercent) && row.discountPercent >= 0 && row.discountPercent <= 100);
     setSubmitting(true);
     try {
-      await supplierOfferingsApi.updateOffering(id, { unitPrice, availableStock });
+      await supplierOfferingsApi.updateOffering(id, {
+        availableStock,
+        regionDiscounts,
+      });
       toast.success('Offering updated.');
       setEditingId(null);
       load();
@@ -1059,85 +1086,144 @@ export default function SupplierOfferingsPage() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Plus className="size-5" />
-                  Add fertilizer with your price
+                  Add fertilizer offering
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <p className="text-sm text-slate-600 mb-4">
-                  Only YARA_JAVA, SA, and CAN. Package sizes: 5, 10, 25, 50 kg. Price in Tanzanian shillings (TZS);
-                  must not exceed TFRA standard. Set your price at or below the TFRA cap to avoid greater loss margin.
+                  Only YARA_JAVA, SA, and CAN. Package sizes: 5, 10, 25, 50 kg. <strong>Unit price is set automatically</strong> from the
+                  TFRA regulator (standard) for that product. You may add optional <strong>percentage discounts</strong> for specific regions—sales points in those regions see the reduced price.
                 </p>
-                <form onSubmit={handleAdd} className="flex flex-wrap items-end gap-4">
-                  <div className="min-w-[220px]">
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Fertilizer × Package</label>
-                    <select
-                      value={form.fertilizerId && form.packageKilos ? `${form.fertilizerId}-${form.packageKilos}` : ''}
-                      onChange={(e) => {
-                        const v = e.target.value;
-                        if (!v) {
-                          setForm((f) => ({ ...f, fertilizerId: '', packageKilos: '' }));
-                          return;
-                        }
-                        const [fid, pkg] = v.split('-').map(Number);
-                        setForm((f) => ({ ...f, fertilizerId: String(fid), packageKilos: String(pkg) }));
-                      }}
-                      className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-slate-900 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
-                    >
-                      <option value="">Select…</option>
-                      {availableOptions.map(({ fertilizer: f, packageKilos: pkg }) => (
-                        <option key={`${f.id}-${pkg}`} value={`${f.id}-${pkg}`}>
-                          {f.name} {f.code ? `(${f.code})` : ''} — {pkg} kg
-                        </option>
-                      ))}
-                    </select>
-                    {availableOptions.length === 0 && fertilizers.length > 0 && (
-                      <p className="mt-1 text-xs text-slate-500">
-                        You already offer all fertilizer × package combinations.
-                      </p>
-                    )}
-                  </div>
-                  <div className="min-w-[140px]">
-                    <Input
-                      label="Your price (TZS)"
-                      type="number"
-                      step="1"
-                      min="0"
-                      required
-                      value={form.unitPrice}
-                      onChange={(e) => setForm((f) => ({ ...f, unitPrice: e.target.value }))}
-                      placeholder="e.g. 10000"
-                      className="min-w-[140px]"
-                    />
+                <form onSubmit={handleAdd} className="space-y-4">
+                  <div className="flex flex-wrap items-end gap-4">
+                    <div className="min-w-[220px]">
+                      <label className="block text-sm font-medium text-slate-700 mb-1">Fertilizer × Package</label>
+                      <select
+                        value={form.fertilizerId && form.packageKilos ? `${form.fertilizerId}-${form.packageKilos}` : ''}
+                        onChange={(e) => {
+                          const v = e.target.value;
+                          if (!v) {
+                            setForm((f) => ({ ...f, fertilizerId: '', packageKilos: '' }));
+                            return;
+                          }
+                          const [fid, pkg] = v.split('-').map(Number);
+                          setForm((f) => ({ ...f, fertilizerId: String(fid), packageKilos: String(pkg) }));
+                        }}
+                        className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-slate-900 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
+                      >
+                        <option value="">Select…</option>
+                        {availableOptions.map(({ fertilizer: f, packageKilos: pkg }) => (
+                          <option key={`${f.id}-${pkg}`} value={`${f.id}-${pkg}`}>
+                            {f.name} {f.code ? `(${f.code})` : ''} — {pkg} kg
+                          </option>
+                        ))}
+                      </select>
+                      {availableOptions.length === 0 && fertilizers.length > 0 && (
+                        <p className="mt-1 text-xs text-slate-500">
+                          You already offer all fertilizer × package combinations.
+                        </p>
+                      )}
+                    </div>
+                    <div className="min-w-[160px]">
+                      <Input
+                        label="Available stock (bags)"
+                        type="number"
+                        step="1"
+                        min="0"
+                        required
+                        value={form.availableStock}
+                        onChange={(e) => setForm((f) => ({ ...f, availableStock: e.target.value }))}
+                        placeholder="e.g. 120"
+                        className="min-w-[160px]"
+                      />
+                    </div>
                     {form.fertilizerId && form.packageKilos && (() => {
                       const fert = fertilizers.find((f) => String(f.id) === form.fertilizerId);
                       const code = (fert?.code || '').toUpperCase();
                       const cap = code && form.packageKilos ? tfraCapByKey.get(`${code}|${form.packageKilos}`) : null;
                       return cap != null ? (
-                        <p className="mt-1.5 text-xs font-medium text-indigo-700">
-                          Average price cap from TFRA: {formatTZS(cap)}
+                        <p className="text-sm font-medium text-indigo-800 self-end pb-2">
+                          Regulator price (TFRA): {formatTZS(cap)} / bag
                         </p>
                       ) : null;
                     })()}
                   </div>
-                  <div className="min-w-[160px]">
-                    <Input
-                      label="Available stock (bags)"
-                      type="number"
-                      step="1"
-                      min="0"
-                      required
-                      value={form.availableStock}
-                      onChange={(e) => setForm((f) => ({ ...f, availableStock: e.target.value }))}
-                      placeholder="e.g. 120"
-                      className="min-w-[160px]"
-                    />
+                  <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-4 space-y-3">
+                    <p className="text-sm font-medium text-slate-800">Optional regional discounts (% off regulator price)</p>
+                    {(form.regionDiscounts || []).map((row, idx) => (
+                      <div key={idx} className="flex flex-wrap items-end gap-2">
+                        <div className="min-w-[200px]">
+                          <label className="block text-xs text-slate-600 mb-1">Region</label>
+                          <select
+                            value={row.regionName || ''}
+                            onChange={(e) => {
+                              const v = e.target.value;
+                              setForm((f) => {
+                                const next = [...(f.regionDiscounts || [])];
+                                next[idx] = { ...next[idx], regionName: v };
+                                return { ...f, regionDiscounts: next };
+                              });
+                            }}
+                            className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
+                          >
+                            <option value="">Select region…</option>
+                            {regionNameOptions.map((rn) => (
+                              <option key={rn} value={rn}>{rn}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <Input
+                          label="Discount %"
+                          type="number"
+                          step="0.1"
+                          min="0"
+                          max="100"
+                          value={row.discountPercent}
+                          onChange={(e) => {
+                            const v = e.target.value;
+                            setForm((f) => {
+                              const next = [...(f.regionDiscounts || [])];
+                              next[idx] = { ...next[idx], discountPercent: v };
+                              return { ...f, regionDiscounts: next };
+                            });
+                          }}
+                          className="w-28"
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() =>
+                            setForm((f) => ({
+                              ...f,
+                              regionDiscounts: (f.regionDiscounts || []).filter((_, i) => i !== idx),
+                            }))
+                          }
+                        >
+                          Remove
+                        </Button>
+                      </div>
+                    ))}
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      onClick={() =>
+                        setForm((f) => ({
+                          ...f,
+                          regionDiscounts: [...(f.regionDiscounts || []), { regionName: '', discountPercent: '' }],
+                        }))
+                      }
+                    >
+                      + Add region discount
+                    </Button>
                   </div>
                   <Button
                     type="submit"
-                    disabled={!form.fertilizerId || !form.packageKilos || !form.unitPrice || form.availableStock === '' || submitting}
+                    disabled={!form.fertilizerId || !form.packageKilos || form.availableStock === '' || submitting}
                     isLoading={submitting}
                   >
-                    Add
+                    Add offering
                   </Button>
                 </form>
               </CardContent>
@@ -1155,7 +1241,7 @@ export default function SupplierOfferingsPage() {
                   <p className="text-slate-500">Loading…</p>
                 ) : offerings.length === 0 ? (
                   <p className="text-slate-500">
-                    You have not added any fertilizers yet. Use the form above to add products and prices.
+                    You have not added any fertilizers yet. Use the form above to add products.
                   </p>
                 ) : (
                   <div className="overflow-x-auto">
@@ -1164,54 +1250,90 @@ export default function SupplierOfferingsPage() {
                         <tr className="border-b border-slate-200">
                           <th className="pb-2 font-medium text-slate-700">Fertilizer</th>
                           <th className="pb-2 font-medium text-slate-700">Code</th>
-                          <th className="pb-2 font-medium text-slate-700">Unit price (TZS)</th>
+                          <th className="pb-2 font-medium text-slate-700">Regulator (TFRA) / bag</th>
+                          <th className="pb-2 font-medium text-slate-700">Regional discounts</th>
                           <th className="pb-2 font-medium text-slate-700">Package (kg)</th>
-                          <th className="pb-2 font-medium text-slate-700">Available stock</th>
+                          <th className="pb-2 font-medium text-slate-700">Stock</th>
                           <th className="pb-2 font-medium text-slate-700">Added</th>
                           <th className="pb-2 font-medium text-slate-700">Actions</th>
                         </tr>
                       </thead>
                       <tbody>
                         {offerings.map((o) => (
-                          <tr key={o.id} className="border-b border-slate-100">
+                          <tr key={o.id} className="border-b border-slate-100 align-top">
                             <td className="py-3 font-medium text-slate-800">{o.fertilizerName}</td>
                             <td className="py-3 text-slate-600">{o.fertilizerCode ?? '—'}</td>
-                            <td className="py-3">
+                            <td className="py-3 text-slate-800 font-medium">
+                              {formatTZS(o.regulatorPriceTzs ?? o.unitPrice)}
+                            </td>
+                            <td className="py-3 text-slate-600 max-w-[220px]">
                               {editingId === o.id ? (
-                                <div className="flex flex-col gap-1.5">
-                                  <div className="flex items-center gap-2">
-                                    <input
-                                      type="number"
-                                      step="0.01"
-                                      min="0"
-                                      value={editPrice}
-                                      onChange={(e) => setEditPrice(e.target.value)}
-                                      className="w-24 rounded border border-slate-200 px-2 py-1 text-sm"
-                                    />
-                                    <Button size="sm" onClick={() => handleUpdate(o.id)} disabled={submitting}>
-                                      Save
-                                    </Button>
-                                    <Button
-                                      size="sm"
-                                      variant="ghost"
-                                      onClick={() => setEditingId(null)}
-                                    >
-                                      Cancel
-                                    </Button>
-                                  </div>
-                                  {(() => {
-                                    const code = (o.fertilizerCode || '').toUpperCase();
-                                    const pkg = o.packageKilos != null ? String(o.packageKilos) : '';
-                                    const cap = code && pkg ? tfraCapByKey.get(`${code}|${pkg}`) : null;
-                                    return cap != null ? (
-                                      <span className="text-xs font-medium text-indigo-700">TFRA cap: {formatTZS(cap)}</span>
-                                    ) : null;
-                                  })()}
+                                <div className="space-y-2">
+                                  {(editRegionDiscounts || []).map((row, idx) => (
+                                    <div key={idx} className="flex flex-wrap gap-1 items-center">
+                                      <select
+                                        value={row.regionName || ''}
+                                        onChange={(e) => {
+                                          const v = e.target.value;
+                                          setEditRegionDiscounts((prev) => {
+                                            const next = [...prev];
+                                            next[idx] = { ...next[idx], regionName: v };
+                                            return next;
+                                          });
+                                        }}
+                                        className="rounded border border-slate-200 px-2 py-1 text-xs max-w-[140px]"
+                                      >
+                                        <option value="">Region…</option>
+                                        {regionNameOptions.map((rn) => (
+                                          <option key={rn} value={rn}>{rn}</option>
+                                        ))}
+                                      </select>
+                                      <input
+                                        type="number"
+                                        min="0"
+                                        max="100"
+                                        step="0.1"
+                                        value={row.discountPercent}
+                                        onChange={(e) => {
+                                          const v = e.target.value;
+                                          setEditRegionDiscounts((prev) => {
+                                            const next = [...prev];
+                                            next[idx] = { ...next[idx], discountPercent: v };
+                                            return next;
+                                          });
+                                        }}
+                                        className="w-16 rounded border border-slate-200 px-1 py-1 text-xs"
+                                      />
+                                      <span className="text-xs">%</span>
+                                      <button
+                                        type="button"
+                                        className="text-xs text-rose-600"
+                                        onClick={() =>
+                                          setEditRegionDiscounts((prev) => prev.filter((_, i) => i !== idx))
+                                        }
+                                      >
+                                        ×
+                                      </button>
+                                    </div>
+                                  ))}
+                                  <button
+                                    type="button"
+                                    className="text-xs text-emerald-700"
+                                    onClick={() =>
+                                      setEditRegionDiscounts((prev) => [...prev, { regionName: '', discountPercent: '' }])
+                                    }
+                                  >
+                                    + Add region
+                                  </button>
                                 </div>
+                              ) : o.regionDiscounts?.length ? (
+                                <ul className="text-xs space-y-0.5">
+                                  {o.regionDiscounts.map((d, i) => (
+                                    <li key={i}>{d.regionName}: {d.discountPercent}% off</li>
+                                  ))}
+                                </ul>
                               ) : (
-                                <span className="font-medium">
-                                  {o.unitPrice != null ? Number(o.unitPrice).toLocaleString() : '—'}
-                                </span>
+                                '—'
                               )}
                             </td>
                             <td className="py-3 text-slate-600">
@@ -1235,15 +1357,31 @@ export default function SupplierOfferingsPage() {
                               {o.createdAt ? formatDateTime(o.createdAt) : '—'}
                             </td>
                             <td className="py-3">
-                              {editingId !== o.id && (
+                              {editingId === o.id ? (
+                                <div className="flex flex-col gap-1">
+                                  <Button size="sm" onClick={() => handleUpdate(o.id)} disabled={submitting}>
+                                    Save
+                                  </Button>
+                                  <Button size="sm" variant="ghost" onClick={() => setEditingId(null)}>
+                                    Cancel
+                                  </Button>
+                                </div>
+                              ) : (
                                 <div className="flex gap-2">
                                   <Button
                                     size="sm"
                                     variant="ghost"
                                     onClick={() => {
                                       setEditingId(o.id);
-                                      setEditPrice(String(o.unitPrice ?? ''));
                                       setEditStock(String(o.availableStock ?? '0'));
+                                      setEditRegionDiscounts(
+                                        o.regionDiscounts?.length
+                                          ? o.regionDiscounts.map((d) => ({
+                                              regionName: d.regionName,
+                                              discountPercent: String(d.discountPercent),
+                                            }))
+                                          : []
+                                      );
                                     }}
                                   >
                                     Edit

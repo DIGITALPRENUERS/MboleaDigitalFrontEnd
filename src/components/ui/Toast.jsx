@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { X, CheckCircle2, AlertCircle } from 'lucide-react';
+import { X, CheckCircle2, AlertCircle, AlertTriangle } from 'lucide-react';
 
 const ToastContext = createContext(null);
 
@@ -22,6 +22,8 @@ export function ToastProvider({ children }) {
 
   const info = useCallback((msg, d) => add(msg, 'info', d), [add]);
 
+  const warning = useCallback((msg, d) => add(msg, 'warning', d), [add]);
+
   const error = useCallback((msg, duration = 5000) => {
     const id = Date.now() + Math.random();
     const durationMs = duration ?? 5000;
@@ -38,7 +40,7 @@ export function ToastProvider({ children }) {
   }, [remove]);
 
   return (
-    <ToastContext.Provider value={{ success, error, info }}>
+    <ToastContext.Provider value={{ success, error, info, warning }}>
       {children}
       {createPortal(
         <div className="fixed top-4 right-4 z-[100] flex flex-col gap-2 max-w-sm" aria-label="Notifications">
@@ -51,13 +53,17 @@ export function ToastProvider({ children }) {
                   ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
                   : t.type === 'info'
                     ? 'border-slate-200 bg-slate-50 text-slate-800'
-                    : 'border-red-200 bg-red-50 text-red-800'
+                    : t.type === 'warning'
+                      ? 'border-amber-200 bg-amber-50 text-amber-900'
+                      : 'border-red-200 bg-red-50 text-red-800'
               } ${t.shakeAt ? 'animate-toast-shake' : ''}`}
             >
               {t.type === 'success' ? (
                 <CheckCircle2 className="size-5 shrink-0" />
               ) : t.type === 'info' ? (
                 <AlertCircle className="size-5 shrink-0 text-slate-600" />
+              ) : t.type === 'warning' ? (
+                <AlertTriangle className="size-5 shrink-0 text-amber-600" />
               ) : (
                 <AlertCircle className="size-5 shrink-0" />
               )}
