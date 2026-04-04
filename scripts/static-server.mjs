@@ -18,12 +18,26 @@ const distPath = path.join(__dirname, '..', 'dist');
 
 const port = parseInt(process.env.PORT || '3000', 10);
 
-const server = http.createServer((req, res) =>
+const server = http.createServer((req, res) => {
+  // Browsers still request /favicon.ico even when <link rel="icon" href="/logo.svg"> exists.
+  // Avoid SPA fallback returning HTML for that path; redirect to the real asset in /public.
+  let pathname = '/';
+  try {
+    pathname = new URL(req.url ?? '/', 'http://localhost').pathname;
+  } catch {
+    /* ignore */
+  }
+  if (pathname === '/favicon.ico') {
+    res.writeHead(302, { Location: '/logo.svg', 'Cache-Control': 'public, max-age=86400' });
+    res.end();
+    return;
+  }
+
   handler(req, res, {
     public: distPath,
     single: true,
-  })
-);
+  });
+});
 
 server.listen(port, '0.0.0.0', () => {
   // Logs should match what Railway’s edge proxy connects to (host + PORT).
