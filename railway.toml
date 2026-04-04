@@ -12,7 +12,9 @@ dockerfilePath = "Dockerfile"
 watchPatterns = ["src/**", "public/**", "scripts/**", "index.html", "package.json", "package-lock.json", "vite.config.js", "*.config.js", "tailwind.config.*", "postcss.config.*", "Dockerfile"]
 
 [deploy]
-# Use Dockerfile CMD: node scripts/static-server.mjs (HTTP/1.1). Do not override startCommand unless you know the implications.
+# Use Dockerfile CMD: node scripts/static-server.mjs — listens on 0.0.0.0:$PORT (Railway injects PORT).
+# If you still see 502 / "Application failed to respond", check public domain target port matches $PORT:
+# https://docs.railway.com/networking/troubleshooting/application-failed-to-respond
 restartPolicyType = "ON_FAILURE"
 healthcheckPath = "/"
 healthcheckTimeout = 300
