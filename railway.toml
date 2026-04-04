@@ -13,6 +13,7 @@ watchPatterns = ["src/**", "public/**", "scripts/**", "index.html", "package.jso
 
 [deploy]
 # Use Dockerfile CMD: node scripts/static-server.mjs — listens on 0.0.0.0:$PORT (Railway injects PORT).
+# Public domain "target port" must match deploy logs (e.g. Listening on ...:8080 → use 8080, not 3000).
 # If you still see 502 / "Application failed to respond", check public domain target port matches $PORT:
 # https://docs.railway.com/networking/troubleshooting/application-failed-to-respond
 restartPolicyType = "ON_FAILURE"

@@ -21,6 +21,7 @@ RUN npm ci --omit=dev && npm cache clean --force
 COPY scripts/static-server.mjs ./scripts/static-server.mjs
 COPY --from=build /app/dist ./dist
 
-# HTTP/1.1 via node:http (see scripts/static-server.mjs) — required for Railway’s proxy; `serve` CLI uses HTTP/2 and causes 502.
-EXPOSE 3000
+# HTTP/1.1 via node:http (see scripts/static-server.mjs). Listen port = $PORT (Railway sets this, often 8080).
+# EXPOSE is only a hint; do not set Railway public "target port" to 3000 unless logs show PORT=3000.
+EXPOSE 8080
 CMD ["node", "scripts/static-server.mjs"]
