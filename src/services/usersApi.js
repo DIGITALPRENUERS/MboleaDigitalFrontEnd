@@ -6,7 +6,7 @@ export async function listUsers() {
   return data;
 }
 
-/** Create user with any role, including TFRA (system admin only). */
+/** Create user (sales point, supplier, or logistic). SYSTEM_ADMIN/TFRA are seeded only. */
 export async function createUser(body) {
   const { data } = await api.post('/users', body);
   return data;

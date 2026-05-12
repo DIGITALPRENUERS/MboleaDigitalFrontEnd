@@ -137,6 +137,7 @@ export default function OrderHistory({ title = 'Order history', emptyMessage = '
                   <th className="pb-2 font-medium">Supplier</th>
                   <th className="pb-2 font-medium">Status</th>
                   <th className="pb-2 font-medium">TFRA</th>
+                  <th className="pb-2 font-medium">TFRA note</th>
                   <th className="pb-2 font-medium">Created</th>
                 </tr>
               </thead>
@@ -157,6 +158,9 @@ export default function OrderHistory({ title = 'Order history', emptyMessage = '
                       <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs">
                         {o.tfraStatus ?? '—'}
                       </span>
+                    </td>
+                    <td className="py-3 text-slate-600 text-xs max-w-[200px]">
+                      {o.tfraStatus === 'REJECTED' && o.tfraComment ? o.tfraComment : '—'}
                     </td>
                     <td className="py-3 text-slate-500 text-xs">
                       {formatDateTime(o.createdAt)}

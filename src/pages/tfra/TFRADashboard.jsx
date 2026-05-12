@@ -2,8 +2,10 @@ import { useState, useEffect, useMemo, Fragment } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import * as tfraPricesApi from '../../services/tfraPricesApi';
 import * as tfraReferencePricesApi from '../../services/tfraReferencePricesApi';
+import * as tfraPriceMasterApi from '../../services/tfraPriceMasterApi';
 import * as fertilizersApi from '../../services/fertilizersApi';
 import * as bulkOrdersApi from '../../services/bulkOrdersApi';
+import { useVisibilityAwareInterval } from '../../hooks/useVisibilityAwareInterval';
 import { withContext } from '../../utils/errorNotifications';
 import { formatDateTime } from '../../utils/dateTime';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card';
@@ -39,11 +41,16 @@ export default function TFRADashboard() {
   const [tfraReferencePrices, setTfraReferencePrices] = useState([]);
   const [fertilizers, setFertilizers] = useState([]);
   const [ordersNeedingApproval, setOrdersNeedingApproval] = useState([]);
-  const [loading, setLoading] = useState({ summary: true, prices: true, referencePrices: true, fertilizers: true, orders: true });
+  const [loading, setLoading] = useState({ summary: true, prices: true, referencePrices: true, fertilizers: true, orders: true, priceMaster: true });
+  const [priceMasterLatest, setPriceMasterLatest] = useState(null);
+  const [priceMasterFile, setPriceMasterFile] = useState(null);
+  const [uploadingPriceMaster, setUploadingPriceMaster] = useState(false);
   const [fertilizerForm, setFertilizerForm] = useState({ name: '', code: '', unit: 'kg', pricePerUnit: '', packageKilos: '' });
   const [submitting, setSubmitting] = useState(false);
   const [confirmingDeleteId, setConfirmingDeleteId] = useState(null);
   const [approvingOrderId, setApprovingOrderId] = useState(null);
+  const [rejectModalOrderId, setRejectModalOrderId] = useState(null);
+  const [rejectReason, setRejectReason] = useState('');
   const [expandedOrderId, setExpandedOrderId] = useState(null);
 
   /** TFRA reference cap by fertilizerType|packageKilos (same as supplier cap). */
@@ -95,7 +102,16 @@ export default function TFRADashboard() {
       .then(setOrdersNeedingApproval)
       .catch((err) => { setOrdersNeedingApproval([]); toast.error(withContext('Load orders for approval', err)); })
       .finally(() => setLoading((l) => ({ ...l, orders: false })));
+    tfraPriceMasterApi
+      .getLatestPriceMaster()
+      .then(setPriceMasterLatest)
+      .catch(() => setPriceMasterLatest(null))
+      .finally(() => setLoading((l) => ({ ...l, priceMaster: false })));
   }, []);
+
+  useVisibilityAwareInterval(() => {
+    bulkOrdersApi.listForTfra().then(setOrdersNeedingApproval).catch(() => {});
+  }, 20000);
 
   const loadFertilizers = () => {
     fertilizersApi.listFertilizers().then(setFertilizers).catch((err) => { setFertilizers([]); toast.error(withContext('Load fertilizers', err)); });
@@ -145,11 +161,53 @@ export default function TFRADashboard() {
     }
   };
 
-  const handleTfraDecision = async (orderId, approved) => {
+  const handleUploadPriceMaster = async (e) => {
+    e?.preventDefault?.();
+    if (!priceMasterFile) {
+      toast.error('Choose an .xlsx file first.');
+      return;
+    }
+    setUploadingPriceMaster(true);
+    try {
+      const res = await tfraPriceMasterApi.uploadPriceMaster(priceMasterFile);
+      setPriceMasterLatest(res);
+      setPriceMasterFile(null);
+      toast.success(`National Price Master updated: ${res.rowCount} rows.`);
+    } catch (err) {
+      toast.error(withContext('Upload price master', err));
+    } finally {
+      setUploadingPriceMaster(false);
+    }
+  };
+
+  const handleTfraApprove = async (orderId) => {
     setApprovingOrderId(orderId);
     try {
-      await bulkOrdersApi.tfraApprove(orderId, { approved, comment: null });
-      toast.success(approved ? 'Order approved.' : 'Order rejected.');
+      await bulkOrdersApi.tfraApprove(orderId, { approved: true, comment: null });
+      toast.success('Order approved.');
+      const updated = await bulkOrdersApi.listForTfra();
+      setOrdersNeedingApproval(updated);
+    } catch (err) {
+      toast.error(withContext('TFRA approval', err));
+    } finally {
+      setApprovingOrderId(null);
+    }
+  };
+
+  const submitTfraReject = async () => {
+    const reason = rejectReason.trim();
+    if (!reason) {
+      toast.error('Please enter a rejection reason.');
+      return;
+    }
+    const orderId = rejectModalOrderId;
+    if (orderId == null) return;
+    setApprovingOrderId(orderId);
+    try {
+      await bulkOrdersApi.tfraApprove(orderId, { approved: false, comment: reason });
+      toast.success('Order rejected.');
+      setRejectModalOrderId(null);
+      setRejectReason('');
       const updated = await bulkOrdersApi.listForTfra();
       setOrdersNeedingApproval(updated);
     } catch (err) {
@@ -248,6 +306,44 @@ export default function TFRADashboard() {
           <Button variant="danger" onClick={handleConfirmDeleteFertilizer}>Delete</Button>
         </div>
       </Modal>
+      <Modal
+        isOpen={rejectModalOrderId != null}
+        onClose={() => {
+          setRejectModalOrderId(null);
+          setRejectReason('');
+        }}
+        title="Reject order"
+        size="md"
+      >
+        <p className="text-sm text-slate-600 mb-4">
+          A reason is required. It will be visible to the sales point and supplier.
+        </p>
+        <textarea
+          className="w-full min-h-[120px] rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400"
+          placeholder="Reason for rejection…"
+          value={rejectReason}
+          onChange={(e) => setRejectReason(e.target.value)}
+          aria-label="Rejection reason"
+        />
+        <div className="flex justify-end gap-2 mt-4">
+          <Button
+            variant="secondary"
+            onClick={() => {
+              setRejectModalOrderId(null);
+              setRejectReason('');
+            }}
+          >
+            Cancel
+          </Button>
+          <Button
+            variant="danger"
+            onClick={submitTfraReject}
+            isLoading={rejectModalOrderId != null && approvingOrderId === rejectModalOrderId}
+          >
+            Reject order
+          </Button>
+        </div>
+      </Modal>
       {/* Collapsible sidebar – bullet-like (AlignJustify) toggle, icon rotates for open/closed */}
       <aside
         style={{ width: sidebarWidth }}
@@ -330,6 +426,46 @@ export default function TFRADashboard() {
               </CardContent>
             </Card>
           </div>
+
+          <Card className="border border-emerald-200/80 bg-gradient-to-br from-emerald-50/90 to-white">
+            <CardHeader className="border-b border-emerald-100 py-3">
+              <CardTitle className="text-base font-semibold text-slate-900">National Price Master (Excel)</CardTitle>
+            </CardHeader>
+            <CardContent className="pt-4 space-y-3">
+              <p className="text-sm text-slate-600">
+                Upload a single <strong>.xlsx</strong> file with header row: <strong>Region</strong>, <strong>District</strong>,{' '}
+                <strong>FertilizerType</strong> (YARA_JAVA, SA, CAN), <strong>PackageKg</strong> (5, 10, 25, 50),{' '}
+                <strong>PriceTzs</strong> (ceiling TZS per bag). This becomes the single source of truth for ceiling prices by
+                location; sales points with a matching region and district use these values. If no row matches, national
+                seeded averages apply.
+              </p>
+              {loading.priceMaster ? (
+                <p className="text-xs text-slate-500">Loading upload status…</p>
+              ) : priceMasterLatest ? (
+                <p className="text-xs text-slate-600">
+                  Active master: <strong>{priceMasterLatest.rowCount}</strong> rows
+                  {priceMasterLatest.originalFilename ? ` · ${priceMasterLatest.originalFilename}` : ''}
+                  {priceMasterLatest.createdAt ? ` · ${formatDateTime(priceMasterLatest.createdAt)}` : ''}
+                </p>
+              ) : (
+                <p className="text-xs text-amber-800">No master file uploaded yet — national averages are used everywhere.</p>
+              )}
+              <form className="flex flex-wrap items-end gap-3" onSubmit={handleUploadPriceMaster}>
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 mb-1">Excel file (.xlsx)</label>
+                  <input
+                    type="file"
+                    accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                    className="text-sm text-slate-700 file:mr-2 file:rounded-lg file:border-0 file:bg-emerald-600 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-white"
+                    onChange={(e) => setPriceMasterFile(e.target.files?.[0] ?? null)}
+                  />
+                </div>
+                <Button type="submit" disabled={uploadingPriceMaster || !priceMasterFile} isLoading={uploadingPriceMaster}>
+                  Upload &amp; activate
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
 
           <div className="grid gap-6 lg:grid-cols-3">
             <Card className="border border-slate-200 bg-white">
@@ -494,7 +630,7 @@ export default function TFRADashboard() {
                                       variant="secondary"
                                       onClick={(e) => {
                                         e.stopPropagation();
-                                        handleTfraDecision(o.id, true);
+                                        handleTfraApprove(o.id);
                                       }}
                                       isLoading={approvingOrderId === o.id}
                                     >
@@ -505,7 +641,8 @@ export default function TFRADashboard() {
                                       variant="danger"
                                       onClick={(e) => {
                                         e.stopPropagation();
-                                        handleTfraDecision(o.id, false);
+                                        setRejectModalOrderId(o.id);
+                                        setRejectReason('');
                                       }}
                                       isLoading={approvingOrderId === o.id}
                                     >

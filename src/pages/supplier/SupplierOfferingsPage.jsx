@@ -5,6 +5,8 @@ import * as supplierOfferingsApi from '../../services/supplierOfferingsApi';
 import * as bulkOrdersApi from '../../services/bulkOrdersApi';
 import * as logisticsApi from '../../services/logisticsApi';
 import * as tfraPricesApi from '../../services/tfraPricesApi';
+import { useVisibilityAwareInterval } from '../../hooks/useVisibilityAwareInterval';
+import { effectiveNetPriceTzs } from '../../utils/pricingPreview';
 import { withContext } from '../../utils/errorNotifications';
 import { formatDateTime } from '../../utils/dateTime';
 import OrderHistory from '../../components/orders/OrderHistory';
@@ -35,6 +37,37 @@ function formatTZS(n) {
   return Number(n).toLocaleString('en-TZ') + ' TZS';
 }
 
+/** Returns an error message if regional discount rows are incomplete, or null if OK. */
+function validateRegionDiscountRows(rows) {
+  for (const row of rows || []) {
+    const rn = row.regionName != null ? String(row.regionName).trim() : '';
+    const raw = row.discountPercent;
+    const pctStr = raw === '' || raw == null ? '' : String(raw).trim();
+    const hasRegion = rn.length > 0;
+    const hasPercent = pctStr !== '' && !Number.isNaN(Number(pctStr));
+    if (hasRegion && !hasPercent) {
+      return 'Enter a discount percent (0–100) for each selected region, or remove the row.';
+    }
+    if (!hasRegion && hasPercent) {
+      return 'Select a region for each discount, or remove the row.';
+    }
+    if (hasRegion && hasPercent) {
+      const p = Number(pctStr);
+      if (Number.isNaN(p) || p < 0 || p > 100) {
+        return 'Discount percent must be between 0 and 100.';
+      }
+      const minRaw = row.minTotalPackages;
+      if (minRaw !== '' && minRaw != null) {
+        const m = Number(minRaw);
+        if (Number.isNaN(m) || m < 1) {
+          return 'Min packages (for bulk discount) must be ≥ 1 or leave empty.';
+        }
+      }
+    }
+  }
+  return null;
+}
+
 export default function SupplierOfferingsPage() {
   const toast = useToast();
   const location = useLocation();
@@ -62,6 +95,11 @@ export default function SupplierOfferingsPage() {
   const [confirmingOrderId, setConfirmingOrderId] = useState(null);
   const [confirmAction, setConfirmAction] = useState(null); // 'own' | 'platform'
   const [tfraPricesByRegion, setTfraPricesByRegion] = useState({});
+  /** Region + district context for TFRA ceiling preview (National Price Master is per district). */
+  const [previewRegion, setPreviewRegion] = useState('');
+  const [previewDistrict, setPreviewDistrict] = useState('');
+  /** Key `${region}|${district}` → preview payload from API */
+  const [regulatorPreviewMap, setRegulatorPreviewMap] = useState({});
 
   const activeSection = pathname === '/supplier' ? 'dashboard' : pathname === '/supplier/orders' ? 'orders' : 'offerings';
   const sidebarWidth = sidebarCollapsed ? 72 : 224;
@@ -104,6 +142,11 @@ export default function SupplierOfferingsPage() {
   useEffect(() => {
     load();
   }, []);
+
+  useVisibilityAwareInterval(() => {
+    bulkOrdersApi.list().then(setOrders).catch(() => {});
+    supplierOfferingsApi.listMyOfferings().then(setOfferings).catch(() => {});
+  }, 15000);
 
   const totalOfferings = offerings.length;
   const activeOrders = useMemo(
@@ -227,6 +270,98 @@ export default function SupplierOfferingsPage() {
     [locationHierarchy]
   );
 
+  const firstDistrictForRegion = useMemo(() => {
+    const regions = locationHierarchy.regions || [];
+    return (regionName) => {
+      if (!regionName) return null;
+      const r = regions.find((x) => x.region_name === regionName);
+      return r?.districts?.[0]?.district_name ?? null;
+    };
+  }, [locationHierarchy]);
+
+  const previewDistrictOptions = useMemo(() => {
+    if (!previewRegion) return [];
+    const r = (locationHierarchy.regions || []).find((x) => x.region_name === previewRegion);
+    return (r?.districts || []).map((d) => d.district_name).filter(Boolean);
+  }, [locationHierarchy, previewRegion]);
+
+  useEffect(() => {
+    if (!previewRegion) {
+      setPreviewDistrict('');
+      return;
+    }
+    const r = (locationHierarchy.regions || []).find((x) => x.region_name === previewRegion);
+    const first = r?.districts?.[0]?.district_name ?? '';
+    setPreviewDistrict(first);
+  }, [previewRegion, locationHierarchy]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const fid = Number(form.fertilizerId);
+    const pkg = form.packageKilos ? Number(form.packageKilos) : null;
+    if (!fid || !pkg) {
+      setRegulatorPreviewMap({});
+      return;
+    }
+
+    const pairs = new Map();
+    const add = (r, d) => {
+      if (!r || !d) return;
+      const k = `${r}|${d}`;
+      pairs.set(k, { r, d });
+    };
+    if (previewRegion && previewDistrict) add(previewRegion, previewDistrict);
+    (form.regionDiscounts || []).forEach((row) => {
+      const rn = row.regionName?.trim();
+      if (!rn) return;
+      const fd = firstDistrictForRegion(rn);
+      if (fd) add(rn, fd);
+    });
+
+    const keys = [...pairs.keys()];
+    if (keys.length === 0) {
+      setRegulatorPreviewMap({});
+      return;
+    }
+
+    const loadingMap = {};
+    keys.forEach((k) => {
+      loadingMap[k] = { loading: true };
+    });
+    setRegulatorPreviewMap(loadingMap);
+
+    (async () => {
+      const updates = {};
+      await Promise.all(
+        keys.map(async (k) => {
+          const { r, d } = pairs.get(k);
+          try {
+            const data = await supplierOfferingsApi.previewRegulatorPrice({
+              fertilizerId: fid,
+              packageKilos: pkg,
+              regionName: r,
+              districtName: d,
+            });
+            updates[k] = {
+              loading: false,
+              regulatorPriceTzs: data.regulatorPriceTzs,
+              fromDistrictPriceMaster: data.fromDistrictPriceMaster,
+            };
+          } catch {
+            updates[k] = { loading: false, error: true };
+          }
+        })
+      );
+      if (!cancelled) {
+        setRegulatorPreviewMap((prev) => ({ ...prev, ...updates }));
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [form.fertilizerId, form.packageKilos, previewRegion, previewDistrict, form.regionDiscounts, firstDistrictForRegion]);
+
   const handleAdd = async (e) => {
     e.preventDefault();
     const fertilizerId = Number(form.fertilizerId);
@@ -236,12 +371,24 @@ export default function SupplierOfferingsPage() {
       toast.error('Select fertilizer, package size, and available stock (>= 0). Price follows TFRA regulator automatically.');
       return;
     }
+    const regionRowErr = validateRegionDiscountRows(form.regionDiscounts);
+    if (regionRowErr) {
+      toast.error(regionRowErr);
+      return;
+    }
     const regionDiscounts = (form.regionDiscounts || [])
       .filter((row) => row.regionName && row.discountPercent !== '' && row.discountPercent != null)
-      .map((row) => ({
-        regionName: String(row.regionName).trim(),
-        discountPercent: Number(row.discountPercent),
-      }))
+      .map((row) => {
+        const o = {
+          regionName: String(row.regionName).trim(),
+          discountPercent: Number(row.discountPercent),
+        };
+        if (row.minTotalPackages !== '' && row.minTotalPackages != null) {
+          const m = Number(row.minTotalPackages);
+          if (!Number.isNaN(m) && m >= 1) o.minTotalPackages = m;
+        }
+        return o;
+      })
       .filter((row) => !Number.isNaN(row.discountPercent) && row.discountPercent >= 0 && row.discountPercent <= 100);
     setSubmitting(true);
     try {
@@ -253,6 +400,9 @@ export default function SupplierOfferingsPage() {
       });
       toast.success('Offering added. Unit price is set from the TFRA regulator; regional discounts apply for selected regions.');
       setForm({ fertilizerId: '', packageKilos: '', availableStock: '', regionDiscounts: [] });
+      setPreviewRegion('');
+      setPreviewDistrict('');
+      setRegulatorPreviewMap({});
       load();
     } catch (err) {
       toast.error(withContext('Add offering', err));
@@ -264,12 +414,24 @@ export default function SupplierOfferingsPage() {
   const handleUpdate = async (id) => {
     const availableStock = editStock === '' ? null : Number(editStock);
     if (availableStock != null && availableStock < 0) return;
+    const regionRowErr = validateRegionDiscountRows(editRegionDiscounts);
+    if (regionRowErr) {
+      toast.error(regionRowErr);
+      return;
+    }
     const regionDiscounts = (editRegionDiscounts || [])
       .filter((row) => row.regionName && row.discountPercent !== '' && row.discountPercent != null)
-      .map((row) => ({
-        regionName: String(row.regionName).trim(),
-        discountPercent: Number(row.discountPercent),
-      }))
+      .map((row) => {
+        const o = {
+          regionName: String(row.regionName).trim(),
+          discountPercent: Number(row.discountPercent),
+        };
+        if (row.minTotalPackages !== '' && row.minTotalPackages != null) {
+          const m = Number(row.minTotalPackages);
+          if (!Number.isNaN(m) && m >= 1) o.minTotalPackages = m;
+        }
+        return o;
+      })
       .filter((row) => !Number.isNaN(row.discountPercent) && row.discountPercent >= 0 && row.discountPercent <= 100);
     setSubmitting(true);
     try {
@@ -922,11 +1084,11 @@ export default function SupplierOfferingsPage() {
                   )}
                 </div>
 
-                {/* Section 3: Other (TFRA approved, not yet paid) */}
+                {/* Section 3: Other (TFRA approved or rejected, not yet paid) */}
                 {otherOrders.length > 0 && (
                   <div className="space-y-4 pt-6 border-t border-slate-200">
                     <h2 className="text-lg font-semibold text-slate-800 flex items-center gap-2">
-                      <span className="text-slate-600">Other orders (TFRA approved, not yet paid)</span>
+                      <span className="text-slate-600">Other orders (TFRA decided, not yet paid)</span>
                       <span className="text-slate-500 font-normal">({otherOrders.length})</span>
                     </h2>
                     <div className="space-y-4">
@@ -947,6 +1109,9 @@ export default function SupplierOfferingsPage() {
                         <div className="flex flex-wrap items-center gap-3">
                           <span className="font-mono text-sm text-slate-600">{o.orderReference}</span>
                           <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-700">{o.status}</span>
+                          {o.tfraStatus === 'REJECTED' && (
+                            <span className="rounded-full bg-rose-100 px-2.5 py-0.5 text-xs font-medium text-rose-800">TFRA rejected</span>
+                          )}
                           {isPendingTfra && (
                             <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-800">Pending TFRA</span>
                           )}
@@ -961,6 +1126,12 @@ export default function SupplierOfferingsPage() {
                       </button>
                       {expandedOrderId === o.id && (
                         <div className="border-t border-slate-100 bg-slate-50/50 px-4 py-4 space-y-4">
+                          {o.tfraStatus === 'REJECTED' && o.tfraComment && (
+                            <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                              <span className="font-medium">TFRA rejection reason: </span>
+                              {o.tfraComment}
+                            </p>
+                          )}
                           <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-2">
                             <p className="text-sm font-semibold text-slate-800">Destination (sales point)</p>
                             <div className="flex flex-wrap gap-4 text-sm text-slate-600">
@@ -1073,7 +1244,7 @@ export default function SupplierOfferingsPage() {
               </CardHeader>
               <CardContent>
                 <p className="text-sm text-slate-600 mb-4">
-                  Only YARA_JAVA, SA, and CAN. Package sizes: 5, 10, 25, 50 kg. Unit pricing is applied automatically by the platform for each product and package. You may add optional <strong>percentage discounts</strong> for specific regions—sales points in those regions see the reduced price.
+                  Only YARA_JAVA, SA, and CAN. Package sizes: 5, 10, 25, 50 kg. <strong>Base price (TFRA ceiling)</strong> is read-only and comes from the National Price Master for the region and district you select. Add optional <strong>discount %</strong> per region; the <strong>net transaction price</strong> shown is what sales points see (after discount), using the same rules as checkout.
                 </p>
                 <form onSubmit={handleAdd} className="space-y-4">
                   <div className="flex flex-wrap items-end gap-4">
@@ -1119,62 +1290,165 @@ export default function SupplierOfferingsPage() {
                       />
                     </div>
                   </div>
+                  <div className="rounded-xl border border-emerald-200/80 bg-emerald-50/40 p-4 space-y-3">
+                    <p className="text-sm font-medium text-slate-800">TFRA base price (read-only)</p>
+                    <p className="text-xs text-slate-600">
+                      Choose a region and district to load the ceiling from the uploaded National Price Master. If no row exists for that district, the national reference average is used.
+                    </p>
+                    <div className="flex flex-wrap items-end gap-3">
+                      <div className="min-w-[180px]">
+                        <label className="block text-xs text-slate-600 mb-1">Preview region</label>
+                        <select
+                          value={previewRegion}
+                          onChange={(e) => setPreviewRegion(e.target.value)}
+                          className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
+                        >
+                          <option value="">Select region…</option>
+                          {regionNameOptions.map((rn) => (
+                            <option key={rn} value={rn}>{rn}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="min-w-[180px]">
+                        <label className="block text-xs text-slate-600 mb-1">Preview district</label>
+                        <select
+                          value={previewDistrict}
+                          onChange={(e) => setPreviewDistrict(e.target.value)}
+                          disabled={!previewRegion}
+                          className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm disabled:opacity-50"
+                        >
+                          <option value="">Select district…</option>
+                          {previewDistrictOptions.map((dn) => (
+                            <option key={dn} value={dn}>{dn}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="min-w-[220px]">
+                        <label className="block text-xs text-slate-600 mb-1">Base price / ceiling (TZS per bag)</label>
+                        <div className="rounded-lg border border-slate-200 bg-slate-100 px-3 py-2 text-sm font-medium text-slate-800">
+                          {(() => {
+                            const k = previewRegion && previewDistrict ? `${previewRegion}|${previewDistrict}` : null;
+                            const p = k ? regulatorPreviewMap[k] : null;
+                            if (!form.fertilizerId || !form.packageKilos) return 'Select product first';
+                            if (!k) return 'Select region & district';
+                            if (p?.loading) return 'Loading…';
+                            if (p?.error) return 'Could not load price';
+                            if (p?.regulatorPriceTzs != null) {
+                              return (
+                                <span>
+                                  {formatTZS(p.regulatorPriceTzs)}
+                                  <span className="ml-2 text-xs font-normal text-slate-500">
+                                    {p.fromDistrictPriceMaster ? '(National Price Master)' : '(National reference)'}
+                                  </span>
+                                </span>
+                              );
+                            }
+                            return '—';
+                          })()}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                   <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-4 space-y-3">
-                    <p className="text-sm font-medium text-slate-800">Optional regional discounts (% for buyers in that region)</p>
-                    {(form.regionDiscounts || []).map((row, idx) => (
-                      <div key={idx} className="flex flex-wrap items-end gap-2">
-                        <div className="min-w-[200px]">
-                          <label className="block text-xs text-slate-600 mb-1">Region</label>
-                          <select
-                            value={row.regionName || ''}
+                    <p className="text-sm font-medium text-slate-800">
+                      Optional regional discounts (% off TFRA ceiling for that region). Set &quot;Min bags&quot; so the discount applies only when the order line has at least that many packages.
+                    </p>
+                    {(form.regionDiscounts || []).map((row, idx) => {
+                      const rn = row.regionName?.trim();
+                      const fd = rn ? firstDistrictForRegion(rn) : null;
+                      const rk = rn && fd ? `${rn}|${fd}` : null;
+                      const rp = rk ? regulatorPreviewMap[rk] : null;
+                      const net =
+                        rp?.regulatorPriceTzs != null
+                          ? effectiveNetPriceTzs(rp.regulatorPriceTzs, row.discountPercent)
+                          : null;
+                      return (
+                      <div key={idx} className="rounded-lg border border-slate-100 bg-white p-3 space-y-2">
+                        <div className="flex flex-wrap items-end gap-2">
+                          <div className="min-w-[200px]">
+                            <label className="block text-xs text-slate-600 mb-1">Region</label>
+                            <select
+                              value={row.regionName || ''}
+                              onChange={(e) => {
+                                const v = e.target.value;
+                                setForm((f) => {
+                                  const next = [...(f.regionDiscounts || [])];
+                                  next[idx] = { ...next[idx], regionName: v };
+                                  return { ...f, regionDiscounts: next };
+                                });
+                              }}
+                              className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
+                            >
+                              <option value="">Select region…</option>
+                              {regionNameOptions.map((rname) => (
+                                <option key={rname} value={rname}>{rname}</option>
+                              ))}
+                            </select>
+                          </div>
+                          <Input
+                            label="Discount %"
+                            type="number"
+                            step="0.1"
+                            min="0"
+                            max="100"
+                            value={row.discountPercent}
                             onChange={(e) => {
                               const v = e.target.value;
                               setForm((f) => {
                                 const next = [...(f.regionDiscounts || [])];
-                                next[idx] = { ...next[idx], regionName: v };
+                                next[idx] = { ...next[idx], discountPercent: v };
                                 return { ...f, regionDiscounts: next };
                               });
                             }}
-                            className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
+                            className="w-28"
+                          />
+                          <Input
+                            label="Min bags (line)"
+                            type="number"
+                            min="1"
+                            step="1"
+                            placeholder="1"
+                            value={row.minTotalPackages ?? ''}
+                            onChange={(e) => {
+                              const v = e.target.value;
+                              setForm((f) => {
+                                const next = [...(f.regionDiscounts || [])];
+                                next[idx] = { ...next[idx], minTotalPackages: v };
+                                return { ...f, regionDiscounts: next };
+                              });
+                            }}
+                            className="w-24"
+                          />
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() =>
+                              setForm((f) => ({
+                                ...f,
+                                regionDiscounts: (f.regionDiscounts || []).filter((_, i) => i !== idx),
+                              }))
+                            }
                           >
-                            <option value="">Select region…</option>
-                            {regionNameOptions.map((rn) => (
-                              <option key={rn} value={rn}>{rn}</option>
-                            ))}
-                          </select>
+                            Remove
+                          </Button>
                         </div>
-                        <Input
-                          label="Discount %"
-                          type="number"
-                          step="0.1"
-                          min="0"
-                          max="100"
-                          value={row.discountPercent}
-                          onChange={(e) => {
-                            const v = e.target.value;
-                            setForm((f) => {
-                              const next = [...(f.regionDiscounts || [])];
-                              next[idx] = { ...next[idx], discountPercent: v };
-                              return { ...f, regionDiscounts: next };
-                            });
-                          }}
-                          className="w-28"
-                        />
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() =>
-                            setForm((f) => ({
-                              ...f,
-                              regionDiscounts: (f.regionDiscounts || []).filter((_, i) => i !== idx),
-                            }))
-                          }
-                        >
-                          Remove
-                        </Button>
+                        <p className="text-xs text-slate-600">
+                          <span className="font-medium text-slate-700">Net transaction price (sales point, est.): </span>
+                          {!form.fertilizerId || !form.packageKilos
+                            ? 'Select product above'
+                            : !rn
+                              ? 'Select a region'
+                              : rp?.loading
+                                ? 'Loading ceiling…'
+                                : rp?.error
+                                  ? 'Could not load ceiling for this region'
+                                  : net != null
+                                    ? `${formatTZS(net)} / bag (ceiling ${formatTZS(rp.regulatorPriceTzs)} from ${rp.fromDistrictPriceMaster ? 'Price Master' : 'national ref.'}, first district in region)`
+                                    : '—'}
+                        </p>
                       </div>
-                    ))}
+                    );})}
                     <Button
                       type="button"
                       variant="secondary"
@@ -1182,7 +1456,7 @@ export default function SupplierOfferingsPage() {
                       onClick={() =>
                         setForm((f) => ({
                           ...f,
-                          regionDiscounts: [...(f.regionDiscounts || []), { regionName: '', discountPercent: '' }],
+                          regionDiscounts: [...(f.regionDiscounts || []), { regionName: '', discountPercent: '', minTotalPackages: '' }],
                         }))
                       }
                     >
@@ -1276,6 +1550,23 @@ export default function SupplierOfferingsPage() {
                                         className="w-16 rounded border border-slate-200 px-1 py-1 text-xs"
                                       />
                                       <span className="text-xs">%</span>
+                                      <input
+                                        type="number"
+                                        min="1"
+                                        step="1"
+                                        placeholder="min"
+                                        title="Min bags on line"
+                                        value={row.minTotalPackages ?? ''}
+                                        onChange={(e) => {
+                                          const v = e.target.value;
+                                          setEditRegionDiscounts((prev) => {
+                                            const next = [...prev];
+                                            next[idx] = { ...next[idx], minTotalPackages: v };
+                                            return next;
+                                          });
+                                        }}
+                                        className="w-12 rounded border border-slate-200 px-1 py-1 text-xs"
+                                      />
                                       <button
                                         type="button"
                                         className="text-xs text-rose-600"
@@ -1291,7 +1582,7 @@ export default function SupplierOfferingsPage() {
                                     type="button"
                                     className="text-xs text-emerald-700"
                                     onClick={() =>
-                                      setEditRegionDiscounts((prev) => [...prev, { regionName: '', discountPercent: '' }])
+                                      setEditRegionDiscounts((prev) => [...prev, { regionName: '', discountPercent: '', minTotalPackages: '' }])
                                     }
                                   >
                                     + Add region
@@ -1300,7 +1591,12 @@ export default function SupplierOfferingsPage() {
                               ) : o.regionDiscounts?.length ? (
                                 <ul className="text-xs space-y-0.5">
                                   {o.regionDiscounts.map((d, i) => (
-                                    <li key={i}>{d.regionName}: {d.discountPercent}% off</li>
+                                    <li key={i}>
+                                      {d.regionName}: {d.discountPercent}% off
+                                      {d.minTotalPackages != null && d.minTotalPackages > 1
+                                        ? ` (from ${d.minTotalPackages}+ bags)`
+                                        : ''}
+                                    </li>
                                   ))}
                                 </ul>
                               ) : (
@@ -1350,6 +1646,8 @@ export default function SupplierOfferingsPage() {
                                           ? o.regionDiscounts.map((d) => ({
                                               regionName: d.regionName,
                                               discountPercent: String(d.discountPercent),
+                                              minTotalPackages:
+                                                d.minTotalPackages != null ? String(d.minTotalPackages) : '',
                                             }))
                                           : []
                                       );

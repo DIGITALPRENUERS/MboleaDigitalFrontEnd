@@ -8,13 +8,14 @@ import Input from '../../components/ui/Input';
 import Modal from '../../components/ui/Modal';
 import { Users } from 'lucide-react';
 
+/** Roles assignable via admin UI. SYSTEM_ADMIN and TFRA are provisioned only via deployment seeding. */
 const ROLE_OPTIONS = [
   { value: 'SALES_POINT', label: 'Sales point' },
   { value: 'SUPPLIER', label: 'Supplier' },
   { value: 'LOGISTIC', label: 'Logistic' },
-  { value: 'TFRA', label: 'TFRA' },
-  { value: 'SYSTEM_ADMIN', label: 'System admin' },
 ];
+
+const PRIVILEGED_ROLES = new Set(['SYSTEM_ADMIN', 'TFRA']);
 
 function formatRole(r) {
   if (!r) return '—';
@@ -33,7 +34,7 @@ export default function AdminUsersPanel() {
     name: '',
     email: '',
     password: '',
-    role: 'TFRA',
+    role: 'SALES_POINT',
     companyName: '',
     companyCode: '',
   });
@@ -43,7 +44,7 @@ export default function AdminUsersPanel() {
     companyName: '',
     companyCode: '',
     isActive: true,
-    userRole: 'TFRA',
+    userRole: 'SALES_POINT',
     password: '',
   });
 
@@ -93,7 +94,7 @@ export default function AdminUsersPanel() {
         name: '',
         email: '',
         password: '',
-        role: 'TFRA',
+        role: 'SALES_POINT',
         companyName: '',
         companyCode: '',
       });
@@ -110,13 +111,16 @@ export default function AdminUsersPanel() {
     if (!editUser) return;
     setSubmitting(true);
     try {
+      const privileged = PRIVILEGED_ROLES.has(formatRole(editUser.role));
       const body = {
         name: editForm.name.trim(),
         companyName: editForm.companyName.trim() || null,
         companyCode: editForm.companyCode.trim() || null,
         isActive: editForm.isActive,
-        userRole: editForm.userRole,
       };
+      if (!privileged) {
+        body.userRole = editForm.userRole;
+      }
       if (editForm.password.trim().length > 0) {
         body.password = editForm.password;
       }
@@ -144,7 +148,8 @@ export default function AdminUsersPanel() {
       </CardHeader>
       <CardContent>
         <p className="mb-4 text-sm text-slate-600">
-          TFRA and other accounts can be created and updated here. Self-signup does not include TFRA.
+          Create sales point, supplier, and logistic accounts here. System admin and TFRA accounts are provisioned via deployment
+          seeding only—not from this form or public sign-up.
         </p>
         {loading ? (
           <p className="text-slate-500">Loading…</p>
@@ -260,20 +265,29 @@ export default function AdminUsersPanel() {
               value={editForm.companyCode}
               onChange={(e) => setEditForm((f) => ({ ...f, companyCode: e.target.value }))}
             />
-            <div className="space-y-1.5">
-              <label className="block text-sm font-medium text-slate-700">Role</label>
-              <select
-                value={editForm.userRole}
-                onChange={(e) => setEditForm((f) => ({ ...f, userRole: e.target.value }))}
-                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-slate-900"
-              >
-                {ROLE_OPTIONS.map((r) => (
-                  <option key={r.value} value={r.value}>
-                    {r.label}
-                  </option>
-                ))}
-              </select>
-            </div>
+            {PRIVILEGED_ROLES.has(formatRole(editUser.role)) ? (
+              <div className="space-y-1.5">
+                <p className="text-sm font-medium text-slate-700">Role</p>
+                <p className="rounded-xl border border-slate-200 bg-slate-100 px-4 py-2.5 text-sm text-slate-800">
+                  {formatRole(editUser.role)} (provisioned via seeding; role cannot be changed here)
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-1.5">
+                <label className="block text-sm font-medium text-slate-700">Role</label>
+                <select
+                  value={editForm.userRole}
+                  onChange={(e) => setEditForm((f) => ({ ...f, userRole: e.target.value }))}
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-slate-900"
+                >
+                  {ROLE_OPTIONS.map((r) => (
+                    <option key={r.value} value={r.value}>
+                      {r.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
             <label className="flex items-center gap-2 text-sm text-slate-700">
               <input
                 type="checkbox"

@@ -141,8 +141,8 @@ export default function SignUp() {
           <>
             <h1 className="text-2xl font-semibold text-slate-800 tracking-tight">Create account</h1>
             <p className="mt-2 text-sm text-slate-500">
-              Register as a sales point, supplier, or logistic user. TFRA accounts are created by a system admin in the admin
-              dashboard.
+              Register as a sales point, supplier, or logistic user. System admin and TFRA accounts are provisioned via deployment
+              seeding only.
             </p>
             <form onSubmit={handleSubmit} className="mt-8 space-y-5">
               {error && (

@@ -7,6 +7,17 @@ export async function listMyOfferings() {
 }
 
 /**
+ * TFRA ceiling / national reference for a fertilizer × package in a region+district context (supplier read-only base).
+ */
+export async function previewRegulatorPrice({ fertilizerId, packageKilos, regionName, districtName }) {
+  const params = { fertilizerId, packageKilos };
+  if (regionName) params.regionName = regionName;
+  if (districtName) params.districtName = districtName;
+  const { data } = await api.get('/supplier/offerings/preview/regulator-price', { params });
+  return data;
+}
+
+/**
  * Add offering. Price is set from TFRA regulator automatically.
  * Body: { fertilizerId, packageKilos, availableStock, regionDiscounts?: [{ regionName, discountPercent }] }
  */

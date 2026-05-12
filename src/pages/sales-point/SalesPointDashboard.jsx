@@ -5,6 +5,7 @@ import * as bulkOrdersApi from '../../services/bulkOrdersApi';
 import * as paymentsApi from '../../services/paymentsApi';
 import * as logisticsApi from '../../services/logisticsApi';
 import * as supplierRatingsApi from '../../services/supplierRatingsApi';
+import { useVisibilityAwareInterval } from '../../hooks/useVisibilityAwareInterval';
 import { withContext } from '../../utils/errorNotifications';
 import { formatDateTime } from '../../utils/dateTime';
 import { useAuth } from '../../context/AuthContext';
@@ -173,13 +174,10 @@ export default function SalesPointDashboard() {
     loadSuppliers();
   }, []);
 
-  // Lightweight polling so stock changes reflect soon after payment confirmations (webhook/simulate-confirm).
-  useEffect(() => {
-    const id = setInterval(() => {
-      loadCatalog();
-    }, 15000);
-    return () => clearInterval(id);
-  }, []);
+  useVisibilityAwareInterval(() => {
+    loadCatalog();
+    loadOrders();
+  }, 15000);
 
   /** Unique fertilizer types and KGs from catalog (for filter dropdowns). */
   const catalogFertilizerTypes = useMemo(() => {
@@ -1197,7 +1195,11 @@ export default function SalesPointDashboard() {
             ) : (
               <div className="space-y-4">
                 {orders
-                  .filter((order) => order.status !== 'DELIVERED' && order.status !== 'CANCELLED')
+                  .filter((order) => {
+                    if (order.status === 'DELIVERED') return false;
+                    if (order.status === 'CANCELLED' && order.tfraStatus !== 'REJECTED') return false;
+                    return true;
+                  })
                   .map((order) => (
                   <Card key={order.id}>
                     <CardContent className="p-0">
@@ -1214,6 +1216,11 @@ export default function SalesPointDashboard() {
                               TFRA: {order.tfraStatus}
                             </span>
                           )}
+                          {order.tfraStatus === 'REJECTED' && order.tfraComment && (
+                            <span className="text-xs text-amber-800 max-w-md truncate" title={order.tfraComment}>
+                              Reason: {order.tfraComment}
+                            </span>
+                          )}
                           <span className="text-sm font-medium text-slate-700">
                             Supplier: {order.supplierUserCompany || order.supplierUserName || 'Unknown company'}
                           </span>
@@ -1226,6 +1233,12 @@ export default function SalesPointDashboard() {
                       </button>
                       {expandedOrderId === order.id && (
                         <div className="border-t border-slate-100 bg-slate-50/50 px-4 py-4">
+                          {order.tfraStatus === 'REJECTED' && order.tfraComment && (
+                            <p className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                              <span className="font-medium">TFRA rejection reason: </span>
+                              {order.tfraComment}
+                            </p>
+                          )}
                           <table className="w-full text-sm">
                             <thead>
                               <tr className="text-left text-slate-500">
