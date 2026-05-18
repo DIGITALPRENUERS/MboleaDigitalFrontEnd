@@ -1011,7 +1011,7 @@ export default function SalesPointDashboard() {
                   return (
                     <article
                       key={o.id}
-                      className={`rounded-2xl border bg-white p-5 shadow-sm transition-all hover:shadow-md hover:border-slate-300/80 ${overTfra ? 'ring-2 ring-amber-300/80 border-amber-200' : 'border-slate-200'}`}
+                      className={`rounded-2xl border bg-slate-100 p-5 shadow-sm transition-all hover:shadow-md hover:border-slate-300/80 dark:bg-slate-800 ${overTfra ? 'ring-2 ring-amber-300/80 border-amber-200' : 'border-slate-200'}`}
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0 flex-1">
@@ -1123,7 +1123,7 @@ export default function SalesPointDashboard() {
                   {cartBySupplier.map(({ supplierUserId, supplierName, lines }) => {
                     const total = lines.reduce((s, l) => s + (l.unitPrice || 0) * (l.quantity || 0), 0);
                     return (
-                      <div key={supplierUserId} className="rounded-xl border border-emerald-200/80 bg-white p-4">
+                      <div key={supplierUserId} className="rounded-xl border border-emerald-200/80 bg-slate-100 p-4 dark:bg-slate-800">
                         <p className="font-medium text-slate-800">{supplierName}</p>
                         <ul className="mt-3 space-y-3">
                           {lines.map((l) => (
@@ -1469,7 +1469,7 @@ setPaymentForm((f) => ({
         {/* Payment confirmation modal */}
         {pendingPayment && (
           <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 px-4">
-            <div className="w-full max-w-lg rounded-2xl bg-white shadow-xl p-6 space-y-4">
+            <div className="w-full max-w-lg rounded-2xl bg-slate-100 shadow-xl p-6 space-y-4 dark:bg-slate-800">
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <h3 className="text-lg font-semibold text-slate-900">Confirm payment</h3>

@@ -394,31 +394,31 @@ export default function TFRADashboard() {
           <h1 className="text-lg font-semibold text-slate-900">Dashboard</h1>
 
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-            <Card className="border border-slate-200 bg-white">
+            <Card className="border border-slate-200">
               <CardContent className="py-4">
                 <p className="text-sm text-slate-500">Regions</p>
                 <p className="text-xl font-semibold text-slate-900 tabular-nums">{loading.summary ? '—' : regionCount}</p>
               </CardContent>
             </Card>
-            <Card className="border border-slate-200 bg-white">
+            <Card className="border border-slate-200">
               <CardContent className="py-4">
                 <p className="text-sm text-slate-500">Districts</p>
                 <p className="text-xl font-semibold text-slate-900 tabular-nums">{loading.prices ? '—' : districtsCount}</p>
               </CardContent>
             </Card>
-            <Card className="border border-slate-200 bg-white">
+            <Card className="border border-slate-200">
               <CardContent className="py-4">
                 <p className="text-sm text-slate-500">Wards</p>
                 <p className="text-xl font-semibold text-slate-900 tabular-nums">{loading.prices ? '—' : wardsCount}</p>
               </CardContent>
             </Card>
-            <Card className="border border-slate-200 bg-white">
+            <Card className="border border-slate-200">
               <CardContent className="py-4">
                 <p className="text-sm text-slate-500">Sales points</p>
                 <p className="text-xl font-semibold text-slate-900 tabular-nums">{loading.prices ? '—' : salesPointsCount}</p>
               </CardContent>
             </Card>
-            <Card className="border border-slate-200 bg-white">
+            <Card className="border border-slate-200">
               <CardContent className="py-4">
                 <p className="text-sm text-slate-500">Fertilizers</p>
                 <p className="text-xl font-semibold text-slate-900 tabular-nums">{loading.fertilizers ? '—' : fertilizers.length}</p>
@@ -427,7 +427,7 @@ export default function TFRADashboard() {
             </Card>
           </div>
 
-          <Card className="border border-emerald-200/80 bg-gradient-to-br from-emerald-50/90 to-white">
+          <Card className="border border-emerald-200/80 bg-gradient-to-br from-emerald-50/90 to-slate-100 dark:from-emerald-950/40 dark:to-slate-800">
             <CardHeader className="border-b border-emerald-100 py-3">
               <CardTitle className="text-base font-semibold text-slate-900">National Price Master (Excel)</CardTitle>
             </CardHeader>
@@ -468,7 +468,7 @@ export default function TFRADashboard() {
           </Card>
 
           <div className="grid gap-6 lg:grid-cols-3">
-            <Card className="border border-slate-200 bg-white">
+            <Card className="border border-slate-200">
               <CardHeader className="border-b border-slate-100 py-3">
                 <CardTitle className="text-sm font-semibold text-slate-800">Sales points by region</CardTitle>
               </CardHeader>
@@ -490,7 +490,7 @@ export default function TFRADashboard() {
                 )}
               </CardContent>
             </Card>
-            <Card className="border border-slate-200 bg-white">
+            <Card className="border border-slate-200">
               <CardHeader className="border-b border-slate-100 py-3">
                 <CardTitle className="text-sm font-semibold text-slate-800">Wards by region</CardTitle>
               </CardHeader>
@@ -512,7 +512,7 @@ export default function TFRADashboard() {
                 )}
               </CardContent>
             </Card>
-            <Card className="border border-slate-200 bg-white">
+            <Card className="border border-slate-200">
               <CardHeader className="border-b border-slate-100 py-3">
                 <CardTitle className="text-sm font-semibold text-slate-800">Coverage overview</CardTitle>
               </CardHeader>
@@ -574,7 +574,7 @@ export default function TFRADashboard() {
                 Review bulk orders from sales points before suppliers and logistics can dispatch.
               </p>
             </div>
-            <Card className="border border-slate-200 bg-white">
+            <Card className="border border-slate-200">
               <CardHeader className="border-b border-slate-100 py-3">
                 <CardTitle className="text-sm font-semibold text-slate-800">Pending orders</CardTitle>
               </CardHeader>

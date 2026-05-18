@@ -20,7 +20,7 @@ const Skeleton = ({ className, variant = 'rectangular', ...props }) => {
 };
 
 export const SkeletonCard = () => (
-    <div className="bg-white p-6 rounded-lg shadow border border-slate-100">
+    <div className="bg-slate-100 dark:bg-slate-800 p-6 rounded-lg shadow border border-slate-100">
         <Skeleton variant="heading" className="w-3/4 mb-4" />
         <Skeleton variant="text" className="w-full mb-2" />
         <Skeleton variant="text" className="w-5/6" />
@@ -28,7 +28,7 @@ export const SkeletonCard = () => (
 );
 
 export const SkeletonTable = ({ rows = 5, columns = 4 }) => (
-    <div className="bg-white rounded-lg shadow-sm border border-slate-100 overflow-hidden">
+    <div className="bg-slate-100 dark:bg-slate-800 rounded-lg shadow-sm border border-slate-100 overflow-hidden">
         <div className="p-4 border-b border-slate-100">
             <Skeleton variant="heading" className="w-1/4" />
         </div>

@@ -178,19 +178,19 @@ export default function AdminDashboard() {
             </p>
           </div>
           <div className="flex flex-wrap gap-3">
-            <div className="min-w-[120px] rounded-xl bg-white/80 px-4 py-3 shadow-sm ring-1 ring-emerald-100">
+            <div className="min-w-[120px] rounded-xl bg-slate-100 px-4 py-3 dark:bg-slate-800 shadow-sm ring-1 ring-emerald-100">
               <p className="text-xs font-medium uppercase tracking-wide text-emerald-700">Fertilizers</p>
               <p className="mt-1 text-lg font-semibold text-slate-900">{totalFertilizers}</p>
             </div>
-            <div className="min-w-[120px] rounded-xl bg-white/80 px-4 py-3 shadow-sm ring-1 ring-sky-100">
+            <div className="min-w-[120px] rounded-xl bg-slate-100 px-4 py-3 dark:bg-slate-800 shadow-sm ring-1 ring-sky-100">
               <p className="text-xs font-medium uppercase tracking-wide text-sky-700">Catalog items</p>
               <p className="mt-1 text-lg font-semibold text-slate-900">{totalCatalogItems}</p>
             </div>
-            <div className="min-w-[120px] rounded-xl bg-white/80 px-4 py-3 shadow-sm ring-1 ring-amber-100">
+            <div className="min-w-[120px] rounded-xl bg-slate-100 px-4 py-3 dark:bg-slate-800 shadow-sm ring-1 ring-amber-100">
               <p className="text-xs font-medium uppercase tracking-wide text-amber-700">Bulk orders</p>
               <p className="mt-1 text-lg font-semibold text-slate-900">{totalOrders}</p>
             </div>
-            <div className="min-w-[120px] rounded-xl bg-white/80 px-4 py-3 shadow-sm ring-1 ring-slate-200">
+            <div className="min-w-[120px] rounded-xl bg-slate-100 px-4 py-3 dark:bg-slate-800 shadow-sm ring-1 ring-slate-200">
               <p className="text-xs font-medium uppercase tracking-wide text-slate-700">Deliveries</p>
               <p className="mt-1 text-lg font-semibold text-slate-900">{totalDeliveries}</p>
             </div>
@@ -199,7 +199,7 @@ export default function AdminDashboard() {
       </div>
 
       {/* Modern tab navigation styled as segmented control */}
-      <nav className="inline-flex gap-1 rounded-2xl border border-slate-200 bg-white p-1 shadow-sm">
+      <nav className="inline-flex gap-1 rounded-2xl border border-slate-200 bg-slate-100 p-1 shadow-sm dark:bg-slate-800">
         {tabs.map(({ id, label, icon: Icon }) => (
           <button
             key={id}

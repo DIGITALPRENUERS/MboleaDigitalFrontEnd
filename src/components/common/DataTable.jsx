@@ -70,7 +70,7 @@ const DataTable = ({ columns, data, onRowClick, isLoading, searchable = false, p
 
     if (!data || data.length === 0) {
         return (
-            <div className="w-full p-12 text-center border rounded-lg bg-white">
+            <div className="w-full p-12 text-center border rounded-lg bg-slate-100 dark:bg-slate-800">
                 <p className="text-slate-500 text-lg font-medium">No data available</p>
                 <p className="text-slate-400 text-sm mt-2">There are no records to display</p>
             </div>
@@ -98,7 +98,7 @@ const DataTable = ({ columns, data, onRowClick, isLoading, searchable = false, p
             )}
 
             {/* Table */}
-            <div className="overflow-x-auto border rounded-lg shadow-sm bg-white">
+            <div className="overflow-x-auto border rounded-lg shadow-sm bg-slate-100 dark:bg-slate-800">
                 <table className="min-w-full divide-y divide-slate-200">
                     <thead className="bg-slate-50">
                         <tr>
@@ -120,7 +120,7 @@ const DataTable = ({ columns, data, onRowClick, isLoading, searchable = false, p
                             ))}
                         </tr>
                     </thead>
-                    <tbody className="bg-white divide-y divide-slate-200">
+                    <tbody className="bg-slate-100 dark:bg-slate-800 divide-y divide-slate-200">
                         {paginatedData.map((row, rowIndex) => (
                             <tr
                                 key={rowIndex}
@@ -143,7 +143,7 @@ const DataTable = ({ columns, data, onRowClick, isLoading, searchable = false, p
 
             {/* Pagination */}
             {pagination && totalPages > 1 && (
-                <div className="flex items-center justify-between px-4 py-3 bg-white border border-slate-200 rounded-lg">
+                <div className="flex items-center justify-between px-4 py-3 bg-slate-100 dark:bg-slate-800 border border-slate-200 rounded-lg">
                     <div className="text-sm text-slate-600">
                         Showing <span className="font-medium">{(currentPage - 1) * pageSize + 1}</span> to{' '}
                         <span className="font-medium">{Math.min(currentPage * pageSize, sortedData.length)}</span> of{' '}
