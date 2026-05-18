@@ -179,6 +179,18 @@ export default function SalesPointDashboard() {
     loadOrders();
   }, 15000);
 
+  useEffect(() => {
+    const onLive = () => {
+      loadOrders();
+      loadDeliveries();
+      loadPayments();
+    };
+    window.addEventListener('mbolea:live-order', onLive);
+    return () => window.removeEventListener('mbolea:live-order', onLive);
+    // Intentionally omit load* from deps: stable enough for event fan-out refreshes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   /** Unique fertilizer types and KGs from catalog (for filter dropdowns). */
   const catalogFertilizerTypes = useMemo(() => {
     const set = new Set();
@@ -422,7 +434,31 @@ export default function SalesPointDashboard() {
   const handleConfirmDelivery = async (id) => {
     setConfirmingDeliveryId(id);
     try {
-      await logisticsApi.confirmDelivery(id);
+      let body;
+      try {
+        const cred = await logisticsApi.getDeliveryProof(id);
+        if (cred?.proofToken) {
+          const pos = await new Promise((resolve) => {
+            if (!navigator.geolocation) {
+              resolve(null);
+              return;
+            }
+            navigator.geolocation.getCurrentPosition(
+              (p) => resolve({ latitude: p.coords.latitude, longitude: p.coords.longitude }),
+              () => resolve(null),
+              { enableHighAccuracy: true, timeout: 12000, maximumAge: 60_000 }
+            );
+          });
+          body = {
+            qrToken: cred.proofToken,
+            latitude: pos?.latitude ?? undefined,
+            longitude: pos?.longitude ?? undefined,
+          };
+        }
+      } catch {
+        /* No QR proof on this delivery or not readable — confirm without body. */
+      }
+      await logisticsApi.confirmDelivery(id, body);
       toast.success('Delivery confirmed. Thank you!');
       loadDeliveries();
       loadOrders();

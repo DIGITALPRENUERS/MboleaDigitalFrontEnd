@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
-import { Truck, LayoutGrid, AlignJustify } from 'lucide-react';
+import { Truck, LayoutGrid, AlignJustify, TrendingUp } from 'lucide-react';
 
 const SIDEBAR_ITEMS = [
   { path: '/logistics', label: 'Dashboard', icon: LayoutGrid },
   { path: '/logistics/deliveries', label: 'Deliveries', icon: Truck },
+  { path: '/logistics/freight', label: 'Freight bids', icon: TrendingUp },
 ];
 
 export default function LogisticsLayout() {

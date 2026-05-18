@@ -5,6 +5,7 @@ import PortalLayout from './layouts/PortalLayout';
 import LogisticsLayout from './layouts/LogisticsLayout';
 import Login from './pages/auth/Login';
 import SignUp from './pages/auth/SignUp';
+import DeliveryProofPage from './pages/public/DeliveryProofPage';
 import DashboardHome from './pages/DashboardHome';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import LogisticsDashboard from './pages/logistics/LogisticsDashboard';
@@ -12,6 +13,8 @@ import LogisticsDeliveriesPage from './pages/logistics/LogisticsDeliveriesPage';
 import TFRADashboard from './pages/tfra/TFRADashboard';
 import SalesPointDashboard from './pages/sales-point/SalesPointDashboard';
 import SupplierOfferingsPage from './pages/supplier/SupplierOfferingsPage';
+import LogisticsFreightMarketPage from './pages/logistics/LogisticsFreightMarketPage';
+import FreightMarketView from './components/freight/FreightMarketView';
 
 export default function App() {
   return (
@@ -19,6 +22,7 @@ export default function App() {
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<SignUp />} />
+          <Route path="/delivery-proof" element={<DeliveryProofPage />} />
           <Route element={<ProtectedRoute />}>
             <Route path="/" element={<DashboardHome />} />
             <Route element={<PortalLayout />}>
@@ -29,6 +33,7 @@ export default function App() {
                 <Route element={<LogisticsLayout />}>
                   <Route index element={<LogisticsDashboard />} />
                   <Route path="deliveries" element={<LogisticsDeliveriesPage />} />
+                  <Route path="freight" element={<LogisticsFreightMarketPage />} />
                 </Route>
               </Route>
               <Route path="tfra" element={<ProtectedRoute allowedRoles={['ROLE_TFRA']} />}>
@@ -47,6 +52,7 @@ export default function App() {
                 <Route index element={<SupplierOfferingsPage />} />
                 <Route path="orders" element={<SupplierOfferingsPage />} />
                 <Route path="offerings" element={<SupplierOfferingsPage />} />
+                <Route path="freight" element={<FreightMarketView />} />
               </Route>
             </Route>
           </Route>

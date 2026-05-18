@@ -3,6 +3,7 @@ import * as fertilizersApi from '../../services/fertilizersApi';
 import * as catalogApi from '../../services/catalogApi';
 import * as bulkOrdersApi from '../../services/bulkOrdersApi';
 import * as logisticsApi from '../../services/logisticsApi';
+import * as reportsApi from '../../services/reportsApi';
 import { withContext } from '../../utils/errorNotifications';
 import { formatDateTime } from '../../utils/dateTime';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card';
@@ -12,7 +13,8 @@ import Modal from '../../components/ui/Modal';
 import StatusBadge from '../../components/common/StatusBadge';
 import OrderHistory from '../../components/orders/OrderHistory';
 import { useToast } from '../../components/ui/Toast';
-import { Package, ListOrdered, Truck, ShoppingBag, History, Users } from 'lucide-react';
+import { Package, ListOrdered, Truck, ShoppingBag, History, Users, Gauge, FileSpreadsheet } from 'lucide-react';
+import { RadialBarChart, RadialBar, PolarAngleAxis, ResponsiveContainer } from 'recharts';
 import AdminUsersPanel from './AdminUsersPanel';
 
 function formatTZS(n) {
@@ -23,6 +25,7 @@ function formatTZS(n) {
 export default function AdminDashboard() {
   const toast = useToast();
   const [activeTab, setActiveTab] = useState('users');
+  const [reportYear, setReportYear] = useState(() => new Date().getFullYear());
   const [fertilizers, setFertilizers] = useState([]);
   const [catalog, setCatalog] = useState([]);
   const [orders, setOrders] = useState([]);
@@ -142,6 +145,7 @@ export default function AdminDashboard() {
     { id: 'orders', label: 'Bulk orders', icon: ListOrdered },
     { id: 'orderHistory', label: 'Order history', icon: History },
     { id: 'deliveries', label: 'Deliveries', icon: Truck },
+    { id: 'insights', label: 'Insights', icon: Gauge },
   ];
 
   const totalFertilizers = fertilizers.length;
@@ -390,7 +394,19 @@ export default function AdminDashboard() {
             ) : deliveries.length === 0 ? (
               <p className="text-slate-500">No deliveries.</p>
             ) : (
-              <div className="space-y-3">
+              <div className="space-y-4">
+                <div className="overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
+                  <iframe
+                    title="Coverage map (OpenStreetMap)"
+                    className="h-52 w-full"
+                    loading="lazy"
+                    src="https://www.openstreetmap.org/export/embed.html?bbox=28.0%2C-12.0%2C41.0%2C-0.5&amp;layer=mapnik"
+                  />
+                  <p className="px-3 py-2 text-xs text-slate-500">
+                    Tanzania overview — pair with registered shop coordinates on user records for distance checks.
+                  </p>
+                </div>
+                <div className="space-y-3">
                 {deliveries.map((d) => (
                   <div key={d.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-100 p-3">
                     <div>
@@ -401,11 +417,90 @@ export default function AdminDashboard() {
                     <span className="text-xs text-slate-500">{formatDateTime(d.createdAt)}</span>
                   </div>
                 ))}
+                </div>
               </div>
             )}
           </CardContent>
         </Card>
       )}
+
+      {activeTab === 'insights' && (
+        <div className="grid gap-6 lg:grid-cols-2">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <FileSpreadsheet className="size-5" />
+                Finance exports
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-sm text-slate-600">
+                NMB credit-line style CSV and a draft TRA-oriented PDF for reconciliation (not a statutory filing).
+              </p>
+              <div className="flex flex-wrap items-end gap-3">
+                <Input
+                  label="Year (TZ)"
+                  type="number"
+                  className="w-32"
+                  value={String(reportYear)}
+                  onChange={(e) => setReportYear(Number(e.target.value) || new Date().getFullYear())}
+                />
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() =>
+                    reportsApi.downloadNmbCreditCsv(reportYear).catch((e) => toast.error(withContext('NMB CSV', e)))
+                  }
+                >
+                  Download NMB CSV
+                </Button>
+                <Button
+                  type="button"
+                  onClick={() =>
+                    reportsApi.downloadTraSummaryPdf(reportYear).catch((e) => toast.error(withContext('TRA PDF', e)))
+                  }
+                >
+                  Download TRA PDF
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Gauge className="size-5" />
+                Flow pressure (illustrative)
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="h-56 w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <RadialBarChart
+                    innerRadius="20%"
+                    outerRadius="100%"
+                    data={[
+                      {
+                        name: 'Load',
+                        uv: Math.min(100, totalOrders * 12 + totalDeliveries * 6),
+                        fill: '#059669',
+                      },
+                    ]}
+                    startAngle={90}
+                    endAngle={-270}
+                  >
+                    <PolarAngleAxis type="number" domain={[0, 100]} tick={false} />
+                    <RadialBar background dataKey="uv" cornerRadius={10} />
+                  </RadialBarChart>
+                </ResponsiveContainer>
+              </div>
+              <p className="mt-2 text-xs text-slate-500">
+                Simple radial gauge from order/delivery counts — replace with D3/Mapbox KPIs when you wire analytics.
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
     </div>
   );
 }

@@ -23,6 +23,11 @@ body {
   color: #0f172a;
 }
 
+html.dark body {
+  background: #020617;
+  color: #e2e8f0;
+}
+
 #root {
   min-height: 100vh;
 }
