@@ -715,7 +715,7 @@ export default function SupplierOfferingsPage() {
             </div>
 
             <Card className="overflow-hidden border-slate-200/80 shadow-sm">
-              <CardHeader className="border-b border-slate-200 bg-slate-100/80 dark:bg-slate-800/80">
+              <CardHeader className="border-b border-slate-200 bg-card/90 dark:bg-slate-800/80">
                 <CardTitle className="flex items-center gap-2 text-slate-800">
                   <Package className="size-5 text-emerald-600" />
                   Offerings by fertilizer
@@ -827,7 +827,7 @@ export default function SupplierOfferingsPage() {
                       {expandedOrderId === o.id && (
                         <div className="border-t border-slate-100 bg-slate-50/50 px-4 py-4 space-y-4">
                           {/* Destination & contact */}
-                          <div className="rounded-xl border border-slate-200 bg-slate-100 p-4 dark:bg-slate-800 space-y-2">
+                          <div className="rounded-xl border border-slate-200 bg-card p-4 dark:bg-slate-800 space-y-2">
                             <p className="text-sm font-semibold text-slate-800">Destination (sales point)</p>
                             <div className="flex flex-wrap gap-4 text-sm text-slate-600">
                               {o.salesPointRegion && <span><strong>Region:</strong> {o.salesPointRegion}</span>}
@@ -994,7 +994,7 @@ export default function SupplierOfferingsPage() {
                       </button>
                       {expandedOrderId === o.id && (
                         <div className="border-t border-slate-100 bg-slate-50/50 px-4 py-4 space-y-4">
-                          <div className="rounded-xl border border-slate-200 bg-slate-100 p-4 dark:bg-slate-800 space-y-2">
+                          <div className="rounded-xl border border-slate-200 bg-card p-4 dark:bg-slate-800 space-y-2">
                             <p className="text-sm font-semibold text-slate-800">Destination (sales point)</p>
                             <div className="flex flex-wrap gap-4 text-sm text-slate-600">
                               {o.salesPointRegion && <span><strong>Region:</strong> {o.salesPointRegion}</span>}
@@ -1132,7 +1132,7 @@ export default function SupplierOfferingsPage() {
                               {o.tfraComment}
                             </p>
                           )}
-                          <div className="rounded-xl border border-slate-200 bg-slate-100 p-4 dark:bg-slate-800 space-y-2">
+                          <div className="rounded-xl border border-slate-200 bg-card p-4 dark:bg-slate-800 space-y-2">
                             <p className="text-sm font-semibold text-slate-800">Destination (sales point)</p>
                             <div className="flex flex-wrap gap-4 text-sm text-slate-600">
                               {o.salesPointRegion && <span><strong>Region:</strong> {o.salesPointRegion}</span>}
@@ -1363,7 +1363,7 @@ export default function SupplierOfferingsPage() {
                           ? effectiveNetPriceTzs(rp.regulatorPriceTzs, row.discountPercent)
                           : null;
                       return (
-                      <div key={idx} className="rounded-lg border border-slate-100 bg-slate-100 p-3 dark:bg-slate-800 space-y-2">
+                      <div key={idx} className="rounded-lg border border-slate-100 bg-card p-3 dark:bg-slate-800 space-y-2">
                         <div className="flex flex-wrap items-end gap-2">
                           <div className="min-w-[200px]">
                             <label className="block text-xs text-slate-600 mb-1">Region</label>

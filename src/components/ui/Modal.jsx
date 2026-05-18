@@ -36,7 +36,7 @@ const Modal = ({ isOpen, onClose, title, children, size = 'md', className }) => 
             {/* Modal */}
             <div
                 className={twMerge(
-                    'relative bg-slate-100 rounded-2xl shadow-2xl w-full dark:bg-slate-800',
+                    'relative bg-card rounded-2xl shadow-2xl w-full dark:bg-slate-800',
                     sizes[size],
                     'animate-fade-in-up',
                     className

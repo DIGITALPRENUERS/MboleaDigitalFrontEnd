@@ -427,7 +427,7 @@ export default function TFRADashboard() {
             </Card>
           </div>
 
-          <Card className="border border-emerald-200/80 bg-gradient-to-br from-emerald-50/90 to-slate-100 dark:from-emerald-950/40 dark:to-slate-800">
+          <Card className="border border-emerald-200/80 bg-gradient-to-br from-emerald-50/90 to-card dark:from-emerald-950/40 dark:to-slate-800">
             <CardHeader className="border-b border-emerald-100 py-3">
               <CardTitle className="text-base font-semibold text-slate-900">National Price Master (Excel)</CardTitle>
             </CardHeader>

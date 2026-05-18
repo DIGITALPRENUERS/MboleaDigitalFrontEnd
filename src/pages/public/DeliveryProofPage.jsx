@@ -34,7 +34,7 @@ export default function DeliveryProofPage() {
 
   return (
     <div className="min-h-screen bg-slate-50 px-4 py-12 text-slate-800">
-      <div className="mx-auto max-w-md rounded-2xl border border-slate-200 bg-slate-100 p-8 shadow-sm">
+      <div className="mx-auto max-w-md rounded-2xl border border-slate-200 bg-card p-8 shadow-sm">
         <h1 className="text-lg font-semibold text-slate-900">Delivery proof</h1>
         <p className="mt-1 text-sm text-slate-500">Mbolea Digital — scanner preview</p>
         {loading && <p className="mt-6 text-sm text-slate-600">Loading…</p>}

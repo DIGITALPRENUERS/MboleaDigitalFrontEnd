@@ -156,13 +156,13 @@ export default function LogisticsDashboard() {
               </p>
             </div>
             <div className="flex flex-wrap gap-3">
-              <div className="min-w-[120px] rounded-xl bg-slate-100 px-4 py-3 dark:bg-slate-800 shadow-sm ring-1 ring-sky-100">
+              <div className="min-w-[120px] rounded-xl bg-card px-4 py-3 dark:bg-slate-800 shadow-sm ring-1 ring-sky-100">
                 <p className="text-xs font-medium uppercase tracking-wide text-sky-700">
                   Total deliveries
                 </p>
                 <p className="mt-1 text-lg font-semibold text-slate-900">{deliveries.length}</p>
               </div>
-              <div className="min-w-[120px] rounded-xl bg-slate-100 px-4 py-3 dark:bg-slate-800 shadow-sm ring-1 ring-emerald-100">
+              <div className="min-w-[120px] rounded-xl bg-card px-4 py-3 dark:bg-slate-800 shadow-sm ring-1 ring-emerald-100">
                 <p className="text-xs font-medium uppercase tracking-wide text-emerald-700">
                   Delivered
                 </p>
@@ -170,7 +170,7 @@ export default function LogisticsDashboard() {
                   {statsByStatus.DELIVERED}
                 </p>
               </div>
-              <div className="min-w-[120px] rounded-xl bg-slate-100 px-4 py-3 dark:bg-slate-800 shadow-sm ring-1 ring-amber-100">
+              <div className="min-w-[120px] rounded-xl bg-card px-4 py-3 dark:bg-slate-800 shadow-sm ring-1 ring-amber-100">
                 <p className="text-xs font-medium uppercase tracking-wide text-amber-700">
                   In transit
                 </p>
@@ -178,7 +178,7 @@ export default function LogisticsDashboard() {
                   {statsByStatus.IN_TRANSIT}
                 </p>
               </div>
-              <div className="min-w-[120px] rounded-xl bg-slate-100 px-4 py-3 dark:bg-slate-800 shadow-sm ring-1 ring-slate-200">
+              <div className="min-w-[120px] rounded-xl bg-card px-4 py-3 dark:bg-slate-800 shadow-sm ring-1 ring-slate-200">
                 <p className="text-xs font-medium uppercase tracking-wide text-slate-700">
                   Pending
                 </p>

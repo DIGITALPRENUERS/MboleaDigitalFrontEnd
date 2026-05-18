@@ -103,7 +103,7 @@ export default function FreightMarketView() {
                 {job.bids?.length > 0 && (
                   <ul className="mt-3 space-y-2 text-sm">
                     {job.bids.map((b) => (
-                      <li key={b.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-slate-100 px-3 py-2 border border-slate-100 dark:bg-slate-800">
+                      <li key={b.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-card px-3 py-2 border border-slate-200 dark:bg-slate-800">
                         <span>
                           {b.bidderName || `User ${b.bidderUserId}`} — {Number(b.amountTzs).toLocaleString('en-TZ')} TZS
                           {b.backloadSuggested ? ' · backload' : ''}

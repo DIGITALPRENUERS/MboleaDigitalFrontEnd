@@ -36,7 +36,7 @@ export default function Login() {
   if (user) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-slate-50 p-6">
-        <div className="w-full max-w-sm rounded-2xl bg-slate-100 p-10 shadow-sm ring-1 ring-slate-200/60 dark:bg-slate-800 text-center">
+        <div className="w-full max-w-sm rounded-2xl bg-card p-10 shadow-sm ring-1 ring-slate-200/60 dark:bg-slate-800 text-center">
           <Link to="/" className="mb-8 flex items-center justify-center gap-2 text-slate-800">
             <Leaf className="size-9 text-emerald-600" />
             <span className="text-xl font-semibold tracking-tight">Mbolea Digital</span>
@@ -66,7 +66,7 @@ export default function Login() {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-slate-50 p-6">
-      <div className="w-full max-w-sm rounded-2xl bg-slate-100 p-10 shadow-sm ring-1 ring-slate-200/60 dark:bg-slate-800">
+      <div className="w-full max-w-sm rounded-2xl bg-card p-10 shadow-sm ring-1 ring-slate-200/60 dark:bg-slate-800">
         <Link to="/" className="mb-8 flex items-center gap-2.5 text-slate-800">
           <Leaf className="size-9 text-emerald-600" />
           <span className="text-xl font-semibold tracking-tight">Mbolea Digital</span>

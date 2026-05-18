@@ -190,7 +190,7 @@ export default function IdleSessionWatcher() {
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
       <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" aria-hidden />
       <div
-        className="relative w-full max-w-md rounded-2xl border border-amber-200 bg-slate-100 p-6 shadow-2xl dark:bg-slate-800 shadow-amber-900/10"
+        className="relative w-full max-w-md rounded-2xl border border-amber-200 bg-card p-6 shadow-2xl dark:bg-slate-800 shadow-amber-900/10"
         onPointerEnter={onModalPointerEnter}
         role="alertdialog"
         aria-labelledby="idle-session-title"
